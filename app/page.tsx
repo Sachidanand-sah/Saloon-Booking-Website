@@ -60,7 +60,11 @@ export default function HomePage() {
               </Button>
             </Link>
             <Link href="/login" className="text-sm font-semibold leading-6 text-white hover:text-pink-200 transition">
-              Client Login <span aria-hidden="true">→</span>
+              Log In
+            </Link>
+            <span className="text-gray-500">|</span>
+            <Link href="/signup" className="text-sm font-semibold leading-6 text-white hover:text-pink-200 transition">
+              Sign Up <span aria-hidden="true">→</span>
             </Link>
           </div>
         </div>

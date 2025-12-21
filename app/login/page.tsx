@@ -13,19 +13,43 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     
-    setTimeout(() => {
+    // Basic client-side validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      alert('Please enter a valid email address.');
       setLoading(false);
-      if (email === 'user@example.com' && password === 'password123') {
+      return;
+    }
+    
+    try {
+      const response = await fetch('http://localhost:5000/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
         // Successful login
+        localStorage.setItem('user', JSON.stringify(data.user));
+        alert(`Welcome back, ${data.user.name}!`);
         router.push('/'); // Redirect to home
       } else {
-        alert('Invalid email or password.');
+        alert(data.message || 'Invalid email or password.');
       }
-    }, 1500);
+    } catch (error) {
+      console.error('Login Error:', error);
+      alert('Failed to connect to the server. Please ensure the backend is running.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -97,16 +121,16 @@ export default function LoginPage() {
               <Button type="submit" className="w-full" isLoading={loading} size="lg">
                 Sign in
               </Button>
-
-              
             </form>
 
-            <p className="mt-4 text-center text-sm text-gray-600">
-              Don't have an account?{' '}
-              <Link href="/book" className="font-medium text-pink-600 hover:text-pink-500">
-                Book as Guest
-              </Link>
-            </p>
+            <div className="pt-6 border-t border-gray-100 mt-6 text-center">
+              <p className="text-sm text-gray-600">
+                Don't have an account?{' '}
+                <Link href="/signup" className="font-semibold text-pink-600 hover:text-pink-500 transition-colors">
+                  Create an Account
+                </Link>
+              </p>
+            </div>
           </div>
         </div>
       </div>

@@ -1,5 +1,6 @@
 'use client';
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { Service } from '../types';
 import TimeSlotSelector from './TimeSlotSelector';
 import Button from './ui/Button';
@@ -77,45 +78,75 @@ export default function BookingForm({ service, onSubmit, submitting }: Props) {
         )}
 
         {step === 2 && (
-          <form onSubmit={submitForm} className="p-8 md:max-w-xl mx-auto w-full space-y-6 animate-fade-in">
+          <div className="p-8 md:max-w-xl mx-auto w-full space-y-6 animate-fade-in">
              <div className="text-center mb-8">
-               <h3 className="text-2xl font-display font-bold text-gray-900">Add Your Details</h3>
+               <h3 className="text-2xl font-display font-bold text-gray-900">Finalize Booking</h3>
                <p className="text-gray-500 mt-2">You are booking for <span className="font-semibold text-gray-900">{date}</span> at <span className="font-semibold text-gray-900">{time}</span>.</p>
              </div>
 
-             <div className="space-y-4">
-              <Input
-                label="Full Name"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                placeholder="Jane Doe"
-                required
-              />
-              <Input
-                label="Email Address"
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="you@example.com"
-              />
-              <Input
-                label="Phone Number"
-                type="tel"
-                value={phone}
-                onChange={e => setPhone(e.target.value)}
-                placeholder="+1 234 567 8900"
-              />
-             </div>
+             {typeof window !== 'undefined' && localStorage.getItem('user') ? (
+               <form onSubmit={submitForm} className="space-y-6">
+                 <div className="bg-pink-50 p-4 rounded-xl border border-pink-100 mb-6">
+                    <p className="text-sm text-pink-700">
+                      Logged in as <span className="font-bold">{JSON.parse(localStorage.getItem('user') || '{}').name}</span>
+                    </p>
+                 </div>
+                 
+                 <div className="space-y-4 text-left">
+                  <Input
+                    label="Confirm Your Name"
+                    value={name || (JSON.parse(localStorage.getItem('user') || '{}').name)}
+                    onChange={e => setName(e.target.value)}
+                    placeholder="Jane Doe"
+                    required
+                  />
+                  <Input
+                    label="Email Address"
+                    type="email"
+                    value={email || (JSON.parse(localStorage.getItem('user') || '{}').email)}
+                    onChange={e => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    disabled
+                  />
+                  <Input
+                    label="Phone Number (Optional)"
+                    type="tel"
+                    value={phone}
+                    onChange={e => setPhone(e.target.value)}
+                    placeholder="+1 234 567 8900"
+                  />
+                 </div>
 
-             <div className="flex gap-4 pt-6">
-               <Button type="button" variant="outline" onClick={() => setStep(1)} className="w-1/3">
-                 Back
-               </Button>
-               <Button type="submit" isLoading={submitting} className="w-2/3">
-                 Confirm Booking
-               </Button>
-             </div>
-          </form>
+                 <div className="flex gap-4 pt-6">
+                   <Button type="button" variant="outline" onClick={() => setStep(1)} className="w-1/3">
+                     Back
+                   </Button>
+                   <Button type="submit" isLoading={submitting} className="w-2/3">
+                     Confirm Appointment
+                   </Button>
+                 </div>
+               </form>
+             ) : (
+               <div className="text-center py-10 space-y-8">
+                 <div className="p-6 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                   <p className="text-gray-600 mb-6">Please sign up or log in to complete your booking. This helps us manage your appointments better.</p>
+                   
+                   <div className="flex flex-col gap-3">
+                     <Link href={`/login?redirect=/book/${service.id}`} className="w-full">
+                       <Button className="w-full" variant="primary">Log In</Button>
+                     </Link>
+                     <Link href={`/signup?redirect=/book/${service.id}`} className="w-full">
+                       <Button className="w-full" variant="outline">Sign Up</Button>
+                     </Link>
+                   </div>
+                 </div>
+                 
+                 <Button type="button" variant="ghost" onClick={() => setStep(1)}>
+                    ← Back to Date Selection
+                 </Button>
+               </div>
+             )}
+          </div>
         )}
       </div>
     </div>
