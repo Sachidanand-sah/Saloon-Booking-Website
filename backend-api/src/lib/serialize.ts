@@ -1,4 +1,4 @@
-import type { Booking, Category, Review, Service, Staff, User } from '@prisma/client';
+import type { Booking, Category, Location, Review, Service, Staff, User } from '@prisma/client';
 import { config } from '../config/env';
 import { toPrice } from './money';
 
@@ -24,6 +24,23 @@ export const staffSummary = (s: Staff) => ({
   title: s.title,
   bio: s.bio,
   avatarUrl: s.avatarUrl,
+  locationId: s.locationId,
+});
+
+export const location = (l: Location) => ({
+  id: l.id,
+  slug: l.slug,
+  name: l.name,
+  description: l.description,
+  addressLine1: l.addressLine1,
+  addressLine2: l.addressLine2,
+  city: l.city,
+  phone: l.phone,
+  email: l.email,
+  latitude: l.latitude,
+  longitude: l.longitude,
+  imageUrl: l.imageUrl,
+  isActive: l.isActive,
 });
 
 export const service = (s: Service & { category?: Category }) => ({
@@ -45,6 +62,7 @@ type BookingWithRelations = Booking & {
   staff: Staff;
   customer?: User;
   review?: Review | null;
+  location?: Location | null;
 };
 
 export const booking = (b: BookingWithRelations, now = new Date()) => {
@@ -66,6 +84,7 @@ export const booking = (b: BookingWithRelations, now = new Date()) => {
     canReview: b.status === 'COMPLETED' && !b.review,
     service: { id: b.service.id, slug: b.service.slug, name: b.service.name, durationMins: b.service.durationMins },
     staff: staffSummary(b.staff),
+    location: b.location ? location(b.location) : null,
     customer: b.customer ? { id: b.customer.id, name: b.customer.name, email: b.customer.email, phone: b.customer.phone } : undefined,
     review: b.review ? { rating: b.review.rating, comment: b.review.comment } : null,
   };

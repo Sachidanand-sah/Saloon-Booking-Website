@@ -1,6 +1,6 @@
-# Lovely Glow — Website
+# Lalima Beauty — Website
 
-The customer website and admin dashboard for Lovely Glow. All data (services, stylists, availability, bookings, reviews) comes live from [`backend-api`](../backend-api/README.md).
+The customer website and admin dashboard for Lalima Beauty, a multi-branch salon in the Kathmandu valley. All data (services, stylists, availability, bookings, reviews) comes live from [`backend-api`](../backend-api/README.md).
 
 **Stack:** Next.js 16 (App Router) · React 19 · Tailwind CSS v4 · TanStack Query · Zod · Playwright
 
@@ -15,16 +15,17 @@ cp .env.example .env.local   # API_URL defaults to http://localhost:5000/api
 npm run dev                  # http://localhost:3000
 ```
 
-Demo logins come from the API seed: `admin@lovelyglow.test / Admin@12345` (admin) and `hello@example.com / password123` (customer).
+Demo logins come from the API seed: `admin@lalima.test / Admin@12345` (admin) and `hello@example.com / password123` (customer).
 
 ## What's inside
 
 | Area | Routes |
 | :--- | :--- |
+| Locations | `/locations` (branch list + live map), `/locations/[slug]` (map, hours, team, treatments, directions) |
 | Marketing | `/` home (hero, categories, featured services, team, reviews, hours) · `/services` (filter + search) · `/services/[slug]` |
-| Booking | `/book`: 4-step wizard (treatment → specialist → date & time → confirm). State lives in the URL, so refresh, back button and "log in to continue" all keep the selection. `/book/success` adds the visit to Google/Apple/Outlook calendars |
+| Booking | `/book`: step-by-step wizard (branch → treatment → specialist → date & time → confirm). State lives in the URL, so refresh, back button and "log in to continue" all keep the selection. `/book/success` adds the visit to Google/Apple/Outlook calendars |
 | Account | `/login`, `/signup`, `/account` (upcoming/past, reschedule, cancel, review, profile) |
-| Admin | `/admin` dashboard · `/admin/bookings` · `/admin/services` · `/admin/staff` (profiles, services, working hours) |
+| Admin | `/admin` dashboard · `/admin/bookings` · `/admin/services` · `/admin/staff` (profiles, branch, services, working hours) · `/admin/branches` |
 
 ## How it talks to the API
 
@@ -36,7 +37,8 @@ Demo logins come from the API seed: `admin@lovelyglow.test / Admin@12345` (admin
 
 - Brand name, address, phone and social links: `lib/site.ts`
 - Colours, fonts, radii, shadows: design tokens in `app/globals.css`
-- Services, prices, stylists and opening hours are managed in the admin dashboard; nothing is hard-coded.
+- Service photos live in `public/images` (credits in `public/images/CREDITS.md`); set any service or branch image in the admin.
+- Branches, services, prices (NPR), stylists and opening hours are managed in the admin dashboard; nothing is hard-coded.
 
 ## Tests
 

@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CircleAlert, RefreshCw } from 'lucide-react';
 import { api, errorMessage } from '@/lib/client';
-import type { Booking, BookingStatus, Category, SalonInfo, Service, StaffSummary } from '@/lib/types';
+import type { Booking, BookingStatus, Category, Location, SalonInfo, Service, StaffSummary } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/providers';
 
@@ -20,6 +20,9 @@ export type AdminStaff = StaffSummary & {
 };
 
 export type AdminService = Service & { staffIds: string[] };
+
+/** GET /admin/locations item (includes inactive branches). */
+export type AdminLocation = Location & { sortOrder: number; staffCount: number };
 
 type Summary = { bookings: number; completed: number; cancelled: number; noShows: number; revenue: number };
 
@@ -49,6 +52,7 @@ export const adminKeys = {
   bookings: ['admin', 'bookings'] as const,
   services: ['admin', 'services'] as const,
   staff: ['admin', 'staff'] as const,
+  locations: ['admin', 'locations'] as const,
 };
 
 export const useSalon = () =>
@@ -56,6 +60,9 @@ export const useSalon = () =>
 
 export const useAdminStaff = () =>
   useQuery({ queryKey: adminKeys.staff, queryFn: () => api.get<AdminStaff[]>('/admin/staff') });
+
+export const useAdminLocations = () =>
+  useQuery({ queryKey: adminKeys.locations, queryFn: () => api.get<AdminLocation[]>('/admin/locations') });
 
 export const useAdminServices = () =>
   useQuery({ queryKey: adminKeys.services, queryFn: () => api.get<AdminService[]>('/admin/services') });

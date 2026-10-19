@@ -31,7 +31,7 @@ export function createApp() {
   }
 
   app.get('/', (_req, res) => {
-    res.json({ name: 'Lovely Glow API', status: 'ok', docs: '/api/health' });
+    res.json({ name: 'Lalima Beauty API', status: 'ok', docs: '/api/health' });
   });
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', time: new Date().toISOString() });

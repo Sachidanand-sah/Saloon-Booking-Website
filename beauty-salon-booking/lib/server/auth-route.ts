@@ -1,6 +1,6 @@
 import 'server-only';
 import { NextResponse } from 'next/server';
-import { API_URL } from './api';
+import { API_URL, forwardedFor } from './api';
 import { storeSession } from './session';
 
 export const unavailable = () =>
@@ -15,7 +15,7 @@ export async function startSession(req: Request, apiPath: '/auth/login' | '/auth
   try {
     res = await fetch(`${API_URL}${apiPath}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(await forwardedFor()) },
       body: await req.text(),
       cache: 'no-store',
     });

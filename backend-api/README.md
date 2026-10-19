@@ -1,4 +1,4 @@
-# Lovely Glow — Booking API
+# Lalima Beauty — Booking API
 
 REST API for the salon website and mobile app: accounts, service catalog, stylists, real-time availability, bookings and the admin dashboard.
 
@@ -23,8 +23,8 @@ Prefer Docker? `docker compose up -d` starts the same database on port 5433 inst
 
 | Role     | Email                   | Password      |
 | :------- | :---------------------- | :------------ |
-| Admin    | `admin@lovelyglow.test` | `Admin@12345` |
-| Stylist  | `maya@lovelyglow.test`  | `Staff@12345` |
+| Admin    | `admin@lalima.test` | `Admin@12345` |
+| Stylist  | `sunita@lalima.test`   | `Staff@12345` |
 | Customer | `hello@example.com`     | `password123` |
 
 ## Scripts
@@ -44,8 +44,10 @@ Prefer Docker? `docker compose up -d` starts the same database on port 5433 inst
 
 All settings live in `.env` (see [.env.example](.env.example)). The important ones:
 
-- `SALON_TIMEZONE`: opening hours and booking dates are interpreted in this zone (e.g. `Asia/Kathmandu`).
+- `SALON_TIMEZONE`: opening hours and booking dates are interpreted in this zone (default `Asia/Kathmandu`).
 - `SLOT_STEP_MINS`, `MIN_LEAD_MINS`, `BOOKING_WINDOW_DAYS`: how far apart start times are, how soon a customer can book, and how far ahead.
+- `CURRENCY`: `NPR` by default; prices are shown as "Rs. 1,500".
+- `AUTH_RATE_LIMIT`: login/signup attempts per visitor IP per 15 minutes.
 - `CANCEL_CUTOFF_MINS`: customers can cancel or reschedule up to this long before their appointment.
 - `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET`: **must** be changed in production. The server refuses to start with the example values.
 
@@ -72,15 +74,17 @@ Errors always look like `{ "code": "SLOT_UNAVAILABLE", "message": "…", "detail
 | GET    | `/categories`        | With active service counts |
 | GET    | `/services`          | `?category=hair&q=colour&featured=true`; includes rating |
 | GET    | `/services/:idOrSlug`| With the stylists who perform it |
-| GET    | `/staff`             | `?serviceId=` to filter |
+| GET    | `/locations`         | Active branches with address, coordinates, team size, services and opening hours |
+| GET    | `/locations/:idOrSlug` | One branch with its team and services |
+| GET    | `/staff`             | `?serviceId=&locationId=` to filter |
 | GET    | `/staff/:id`         | Profile, services and weekly hours |
 | GET    | `/reviews`           | `?limit=&serviceId=`; latest reviews for testimonials |
-| GET    | `/availability`      | `?serviceId&date=YYYY-MM-DD&staffId?` → `slots: [{ startAt, endAt, staffIds }]` |
+| GET    | `/availability`      | `?serviceId&date=YYYY-MM-DD&staffId?&locationId?` → `slots: [{ startAt, endAt, staffIds }]` |
 
 ### Bookings (signed in)
 | Method | Path                       | Notes |
 | :----- | :------------------------- | :---- |
-| POST   | `/bookings`                | `{ serviceId, startAt (ISO), staffId?, notes? }`. Without `staffId` the least-busy free stylist is assigned |
+| POST   | `/bookings`                | `{ serviceId, startAt (ISO), staffId?, locationId?, notes? }`. Without `staffId` the least-busy free stylist is assigned |
 | GET    | `/bookings`                | `?scope=upcoming\|past\|all`, the caller's bookings |
 | GET    | `/bookings/:id`            | |
 | POST   | `/bookings/:id/cancel`     | |
@@ -91,6 +95,7 @@ Errors always look like `{ "code": "SLOT_UNAVAILABLE", "message": "…", "detail
 ### Admin (role `ADMIN`)
 `GET /admin/stats` · `GET /admin/bookings` (filters: `from, to, status, staffId, q, page`) · `PATCH /admin/bookings/:id` (`{ status }`) ·
 `GET|POST /admin/services`, `PATCH|DELETE /admin/services/:id` · `POST /admin/categories`, `PATCH /admin/categories/:id` ·
+`GET|POST /admin/locations`, `PATCH|DELETE /admin/locations/:id` ·
 `GET|POST /admin/staff`, `PATCH /admin/staff/:id`, `PUT /admin/staff/:id/hours`, `PUT /admin/staff/:id/services` · `GET /admin/customers`
 
 ## How double-booking is prevented

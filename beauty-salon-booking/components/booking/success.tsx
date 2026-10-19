@@ -7,10 +7,11 @@ import { Avatar, Skeleton } from '@/components/ui/misc';
 import { api } from '@/lib/client';
 import { formatDate, formatDuration, formatPrice, formatTime } from '@/lib/format';
 import { site } from '@/lib/site';
+import { directionsUrl, formatAddress } from '@/lib/maps';
 import type { Booking, SalonInfo } from '@/lib/types';
 
 const icsStamp = (iso: string) => new Date(iso).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-const address = `${site.address.line1}, ${site.address.line2}, ${site.address.city}`;
+const where = (b: Booking) => (b.location ? `${b.location.name}, ${formatAddress(b.location)}` : site.name);
 
 function googleCalendarUrl(b: Booking) {
   const p = new URLSearchParams({
@@ -18,7 +19,7 @@ function googleCalendarUrl(b: Booking) {
     text: `${b.service.name} at ${site.name}`,
     dates: `${icsStamp(b.startAt)}/${icsStamp(b.endAt)}`,
     details: `With ${b.staff.name}. Manage your booking at ${site.url}/account`,
-    location: address,
+    location: where(b),
   });
   return `https://calendar.google.com/calendar/render?${p}`;
 }
@@ -29,13 +30,13 @@ function downloadIcs(b: Booking) {
     'VERSION:2.0',
     `PRODID:-//${site.name}//Booking//EN`,
     'BEGIN:VEVENT',
-    `UID:${b.id}@lovelyglow`,
+    `UID:${b.id}@lalimabeauty`,
     `DTSTAMP:${icsStamp(new Date().toISOString())}`,
     `DTSTART:${icsStamp(b.startAt)}`,
     `DTEND:${icsStamp(b.endAt)}`,
     `SUMMARY:${b.service.name} at ${site.name}`,
     `DESCRIPTION:With ${b.staff.name}`,
-    `LOCATION:${address.replace(/,/g, '\\,')}`,
+    `LOCATION:${where(b).replace(/,/g, '\\,')}`,
     'END:VEVENT',
     'END:VCALENDAR',
   ].join('\r\n');
@@ -94,7 +95,23 @@ export function BookingSuccess({ id }: { id?: string }) {
           <div className="flex justify-between gap-4 py-4">
             <dt className="text-muted">Where</dt>
             <dd className="flex items-start gap-1.5 text-right font-medium text-plum-900">
-              <MapPin className="mt-0.5 size-4 text-rose-500" /> {address}
+              <MapPin className="mt-0.5 size-4 shrink-0 text-rose-500" />
+              {b.location ? (
+                <span>
+                  {b.location.name}
+                  <br />
+                  <a
+                    href={directionsUrl(b.location)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-normal text-muted hover:text-rose-600"
+                  >
+                    {formatAddress(b.location)}
+                  </a>
+                </span>
+              ) : (
+                site.name
+              )}
             </dd>
           </div>
           <div className="flex justify-between gap-4 py-4">

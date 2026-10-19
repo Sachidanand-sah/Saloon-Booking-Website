@@ -14,6 +14,8 @@ type Query = {
   serviceId: string;
   date: string;
   staffId?: string;
+  /** Limit to stylists at one branch (id or slug). */
+  locationId?: string;
   /** Booking to ignore when checking conflicts (used when rescheduling). */
   excludeBookingId?: string;
   now?: Date;
@@ -42,8 +44,11 @@ export async function getAvailability(q: Query) {
 
   const staffWhere: Prisma.StaffWhereInput = {
     isActive: true,
+    // Stylists at a closed (deactivated) branch can't be booked.
+    NOT: { location: { isActive: false } },
     services: { some: { serviceId: service.id } },
     ...(q.staffId ? { id: q.staffId } : {}),
+    ...(q.locationId ? { location: { OR: [{ id: q.locationId }, { slug: q.locationId }] } } : {}),
   };
   const staff = await prisma.staff.findMany({
     where: staffWhere,
@@ -100,6 +105,7 @@ export async function staffFreeAt(opts: {
   serviceId: string;
   startAt: Date;
   staffId?: string;
+  locationId?: string;
   excludeBookingId?: string;
 }) {
   const date = DateTime.fromJSDate(opts.startAt, { zone: config.SALON_TIMEZONE }).toISODate()!;

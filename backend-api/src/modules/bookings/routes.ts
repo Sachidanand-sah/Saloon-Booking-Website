@@ -13,7 +13,10 @@ import { ACTIVE_STATUSES, staffFreeAt } from '../availability/service';
 export const bookingsRouter = Router();
 bookingsRouter.use(requireAuth);
 
-const include = { service: true, staff: true, review: true } satisfies Prisma.BookingInclude;
+const include = { service: true, staff: true, review: true, location: true } satisfies Prisma.BookingInclude;
+
+const staffLocation = async (staffId: string) =>
+  (await prisma.staff.findUnique({ where: { id: staffId }, select: { locationId: true } }))?.locationId ?? null;
 
 const startAtField = z
   .string()
@@ -76,6 +79,7 @@ bookingsRouter.post('/', async (req, res) => {
     z.object({
       serviceId: z.string().min(1),
       staffId: z.string().min(1).optional(),
+      locationId: z.string().min(1).optional(),
       startAt: startAtField,
       notes: z.string().trim().max(500).optional(),
     }),
@@ -85,6 +89,7 @@ bookingsRouter.post('/', async (req, res) => {
     serviceId: data.serviceId,
     startAt: data.startAt,
     staffId: data.staffId,
+    locationId: data.locationId,
   });
   const staffId = await chooseStaff(staffIds, data.staffId, data.startAt);
   const { priceCents } = await prisma.service.findUniqueOrThrow({
@@ -98,6 +103,7 @@ bookingsRouter.post('/', async (req, res) => {
         customerId: sub,
         serviceId: service.id,
         staffId,
+        locationId: await staffLocation(staffId),
         startAt: data.startAt,
         endAt: new Date(data.startAt.getTime() + service.durationMins * 60_000),
         priceCents,
@@ -179,6 +185,8 @@ bookingsRouter.post('/:id/reschedule', async (req, res) => {
     serviceId: existing.serviceId,
     startAt: data.startAt,
     staffId: data.staffId,
+    // Stay at the same branch unless a specific stylist was requested.
+    locationId: data.staffId ? undefined : (existing.locationId ?? undefined),
     excludeBookingId: existing.id,
   });
   // Keep the same stylist when they're free and none was requested.
@@ -190,6 +198,7 @@ bookingsRouter.post('/:id/reschedule', async (req, res) => {
       where: { id: existing.id },
       data: {
         staffId,
+        locationId: await staffLocation(staffId),
         startAt: data.startAt,
         endAt: new Date(data.startAt.getTime() + service.durationMins * 60_000),
       },

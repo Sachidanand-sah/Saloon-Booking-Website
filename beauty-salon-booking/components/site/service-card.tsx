@@ -4,7 +4,7 @@ import { ServiceArt, Stars } from '@/components/ui/misc';
 import { formatDuration, formatPrice } from '@/lib/format';
 import type { Service } from '@/lib/types';
 
-export function ServiceCard({ service }: { service: Service }) {
+export function ServiceCard({ service, bookHref }: { service: Service; bookHref?: string }) {
   return (
     <article className="card group flex flex-col overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-lift">
       <Link href={`/services/${service.slug}`} className="relative block" tabIndex={-1} aria-hidden>
@@ -12,7 +12,7 @@ export function ServiceCard({ service }: { service: Service }) {
           category={service.category?.slug}
           imageUrl={service.imageUrl}
           name={service.name}
-          className="h-44 w-full transition-transform duration-500 group-hover:scale-[1.03]"
+          className="h-52 w-full transition-transform duration-500 group-hover:scale-[1.03]"
         />
         {service.category ? (
           <span className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-plum-800 backdrop-blur">
@@ -45,7 +45,7 @@ export function ServiceCard({ service }: { service: Service }) {
             ) : null}
           </div>
           <Link
-            href={`/book?service=${service.slug}`}
+            href={bookHref ?? `/book?service=${service.slug}`}
             className="inline-flex items-center gap-1 text-sm font-semibold text-rose-600 hover:gap-2 hover:text-rose-500"
             style={{ transition: 'gap 0.2s' }}
             aria-label={`Book ${service.name}`}

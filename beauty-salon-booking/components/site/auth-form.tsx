@@ -108,7 +108,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
 
           <form onSubmit={onSubmit} noValidate className="mt-8 space-y-5">
             {mode === 'signup' ? (
-              <Input label="Full name" name="name" autoComplete="name" placeholder="Jane Doe" error={errors.name} />
+              <Input label="Full name" name="name" autoComplete="name" placeholder="Sita Sharma" error={errors.name} />
             ) : null}
             <Input
               label="Email"
@@ -124,7 +124,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
                 name="phone"
                 type="tel"
                 autoComplete="tel"
-                placeholder="+1 555 000 0000"
+                placeholder="98XXXXXXXX"
                 hint="For appointment reminders only."
                 error={errors.phone}
               />

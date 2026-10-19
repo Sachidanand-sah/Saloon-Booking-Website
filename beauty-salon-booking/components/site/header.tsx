@@ -13,7 +13,7 @@ const links = [
   { href: '/services', label: 'Services' },
   { href: '/#team', label: 'Our team' },
   { href: '/#reviews', label: 'Reviews' },
-  { href: '/#visit', label: 'Visit us' },
+  { href: '/locations', label: 'Locations' },
 ];
 
 export function Logo({ light }: { light?: boolean }) {

@@ -5,6 +5,7 @@ import { config } from '../../config/env';
 import { prisma } from '../../lib/prisma';
 import { notFound } from '../../lib/errors';
 import * as serialize from '../../lib/serialize';
+import { openingHours } from '../../lib/hours';
 import { query } from '../../middleware/validate';
 
 export const catalogRouter = Router();
@@ -31,25 +32,54 @@ async function ratingsByService(serviceIds: string[]) {
 }
 
 catalogRouter.get('/salon', async (_req, res) => {
-  const hours = await prisma.workingHours.findMany({ where: { staff: { isActive: true } } });
-  // Salon is open whenever at least one stylist is working; report the outer bounds per weekday.
-  const openingHours = [1, 2, 3, 4, 5, 6, 7].map(dayOfWeek => {
-    const shifts = hours.filter(h => h.dayOfWeek === dayOfWeek);
-    return shifts.length
-      ? {
-          dayOfWeek,
-          open: Math.min(...shifts.map(s => s.startMinute)),
-          close: Math.max(...shifts.map(s => s.endMinute)),
-        }
-      : { dayOfWeek, open: null, close: null };
-  });
+  const [hours, locationCount] = await Promise.all([
+    prisma.workingHours.findMany({ where: { staff: { isActive: true } } }),
+    prisma.location.count({ where: { isActive: true } }),
+  ]);
   res.json({
     timezone: config.SALON_TIMEZONE,
     currency: config.CURRENCY,
     slotStepMins: config.SLOT_STEP_MINS,
     bookingWindowDays: config.BOOKING_WINDOW_DAYS,
     cancelCutoffMins: config.CANCEL_CUTOFF_MINS,
-    openingHours,
+    locationCount,
+    openingHours: openingHours(hours),
+  });
+});
+
+// ---------- Branches ----------
+
+const activeStaffAt = { where: { isActive: true }, include: { workingHours: true, services: { include: { service: true } } } };
+
+catalogRouter.get('/locations', async (_req, res) => {
+  const locations = await prisma.location.findMany({
+    where: { isActive: true },
+    include: { staff: activeStaffAt },
+    orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+  });
+  res.json(
+    locations.map(l => ({
+      ...serialize.location(l),
+      staffCount: l.staff.length,
+      serviceIds: [...new Set(l.staff.flatMap(s => s.services.filter(x => x.service.isActive).map(x => x.serviceId)))],
+      openingHours: openingHours(l.staff.flatMap(s => s.workingHours)),
+    })),
+  );
+});
+
+catalogRouter.get('/locations/:idOrSlug', async (req, res) => {
+  const l = await prisma.location.findFirst({
+    where: { ...byIdOrSlug(req.params.idOrSlug), isActive: true },
+    include: { staff: { ...activeStaffAt, orderBy: { name: 'asc' } } },
+  });
+  if (!l) throw notFound('Branch');
+  const services = new Map<string, Prisma.ServiceGetPayload<object>>();
+  for (const s of l.staff) for (const link of s.services) if (link.service.isActive) services.set(link.serviceId, link.service);
+  res.json({
+    ...serialize.location(l),
+    openingHours: openingHours(l.staff.flatMap(s => s.workingHours)),
+    staff: l.staff.map(serialize.staffSummary),
+    services: [...services.values()].sort((a, b) => a.name.localeCompare(b.name)).map(s => serialize.service(s)),
   });
 });
 
@@ -68,10 +98,13 @@ catalogRouter.get('/services', async (req, res) => {
       category: z.string().optional(),
       q: z.string().trim().max(80).optional(),
       featured: z.enum(['true', 'false']).optional(),
+      locationId: z.string().optional(),
     }),
   );
   const where: Prisma.ServiceWhereInput = { isActive: true };
   if (q.category) where.category = { slug: q.category };
+  // Only services someone at that branch can perform.
+  if (q.locationId) where.staff = { some: { staff: { isActive: true, location: byIdOrSlug(q.locationId) } } };
   if (q.featured) where.isFeatured = q.featured === 'true';
   if (q.q) {
     where.OR = [
@@ -106,15 +139,21 @@ catalogRouter.get('/services/:idOrSlug', async (req, res) => {
 });
 
 catalogRouter.get('/staff', async (req, res) => {
-  const q = query(req, z.object({ serviceId: z.string().optional() }));
+  const q = query(req, z.object({ serviceId: z.string().optional(), locationId: z.string().optional() }));
   const staff = await prisma.staff.findMany({
-    where: { isActive: true, ...(q.serviceId ? { services: { some: { service: byIdOrSlug(q.serviceId) } } } : {}) },
-    include: { services: { include: { service: true } } },
+    where: {
+      isActive: true,
+      NOT: { location: { isActive: false } },
+      ...(q.serviceId ? { services: { some: { service: byIdOrSlug(q.serviceId) } } } : {}),
+      ...(q.locationId ? { location: byIdOrSlug(q.locationId) } : {}),
+    },
+    include: { services: { include: { service: true } }, location: true },
     orderBy: { name: 'asc' },
   });
   res.json(
     staff.map(s => ({
       ...serialize.staffSummary(s),
+      location: s.location ? { id: s.location.id, slug: s.location.slug, name: s.location.name } : null,
       services: s.services.filter(l => l.service.isActive).map(l => ({ id: l.service.id, name: l.service.name })),
     })),
   );

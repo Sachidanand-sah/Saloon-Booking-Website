@@ -1,13 +1,15 @@
-/** Brand and contact details shown across the site. Edit these for your salon. */
+/**
+ * Brand-wide details shown across the site. Edit these for your salon.
+ * Branch addresses, phones and maps are managed in Admin → Branches.
+ */
 export const site = {
-  name: 'Lovely Glow',
-  tagline: 'Beauty studio & spa',
+  name: 'Lalima Beauty',
+  /** लालिमा: the warm glow of dawn. */
+  tagline: 'Beauty studio & spa · Kathmandu',
   description:
-    'Award-winning hair, skin, nail and spa treatments by senior stylists. Book online in under a minute.',
-  phone: '+1 (555) 014-2290',
-  email: 'hello@lovelyglow.com',
-  address: { line1: '24 Blossom Avenue', line2: 'Suite 3', city: 'Springfield' },
-  mapUrl: 'https://maps.google.com/?q=24+Blossom+Avenue',
+    'Hair, skin, nail and spa treatments by senior specialists across the Kathmandu valley. Book online in under a minute.',
+  phone: '+977 1-5550100',
+  email: 'namaste@lalimabeauty.com.np',
   social: { instagram: 'https://instagram.com/', facebook: 'https://facebook.com/' },
   url: process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000',
 };

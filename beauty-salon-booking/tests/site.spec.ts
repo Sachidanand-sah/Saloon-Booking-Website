@@ -16,7 +16,7 @@ test('home page shows live services, team and reviews', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1 })).toContainText('quiet luxury');
   await expect(page.getByRole('heading', { name: 'Balayage' })).toBeVisible();
-  await expect(page.locator('#team').getByRole('heading', { name: 'Maya Laurent' })).toBeVisible();
+  await expect(page.locator('#team').getByRole('heading', { name: 'Sunita Shrestha' })).toBeVisible();
   await expect(page.locator('#reviews figure').first()).toBeVisible();
 });
 
@@ -32,6 +32,22 @@ test('services can be filtered by category and search', async ({ page }) => {
   await expect(page.getByText('1 treatment', { exact: true })).toBeVisible();
 });
 
+test('locations page lists branches with a map', async ({ page }) => {
+  await page.goto('/locations');
+  await expect(page.getByRole('heading', { name: 'Lalima Baneshwor' })).toBeVisible();
+  await expect(page.locator('iframe[title^="Map of"]')).toBeVisible();
+  await page.getByRole('link', { name: 'Branch details' }).first().click();
+  await expect(page).toHaveURL(/\/locations\/baneshwor/);
+  await expect(page.getByText('New Baneshwor Road').first()).toBeVisible();
+});
+
+test('prices are shown in Nepali rupees', async ({ page }) => {
+  // Catalog pages are cached briefly and refresh in the background, so load twice.
+  await page.goto('/services/precision-haircut');
+  await page.reload();
+  await expect(page.getByText('Rs. 800').first()).toBeVisible();
+});
+
 test('account pages require login', async ({ page }) => {
   await page.goto('/account');
   await expect(page).toHaveURL(/\/login\?next=%2Faccount/);
@@ -41,7 +57,13 @@ test('guest books, sees it in their account, then cancels', async ({ page }) => 
   // Start as a guest from a service page; selection must survive signing up.
   await page.goto('/services/precision-haircut');
   await page.getByRole('link', { name: 'Book this treatment' }).click();
-  await page.getByRole('button', { name: /Any available/ }).click();
+  // Several branches: choose one first.
+  await expect(page.getByRole('heading', { name: 'Choose a branch' })).toBeVisible();
+  await page.getByRole('button', { name: /Lalima Baneshwor/ }).click();
+  // The specialist step is skipped when only one stylist at the branch offers the service.
+  const anyStylist = page.getByRole('button', { name: /Any available/ });
+  await expect(anyStylist.or(page.getByRole('heading', { name: 'Pick a date & time' }))).toBeVisible();
+  if (await anyStylist.isVisible()) await anyStylist.click();
 
   await expect(page.getByRole('heading', { name: 'Pick a date & time' })).toBeVisible();
   // Find the first day with free times.
@@ -95,7 +117,7 @@ test('customers cannot open the admin dashboard', async ({ page }) => {
 
 test('admin sees the dashboard and bookings', async ({ page, isMobile }) => {
   await page.goto('/login');
-  await page.getByLabel('Email').fill('admin@lovelyglow.test');
+  await page.getByLabel('Email').fill('admin@lalima.test');
   await page.getByLabel('Password').fill('Admin@12345');
   await page.getByRole('button', { name: 'Log in' }).click();
   await expect(page).toHaveURL(/\/admin$/);

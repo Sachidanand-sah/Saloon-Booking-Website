@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Clock, Mail, Pencil, Plus, Scissors, Trash2, UserPlus, Users } from 'lucide-react';
+import { Clock, Mail, MapPin, Pencil, Plus, Scissors, Trash2, UserPlus, Users } from 'lucide-react';
 import {
   Checkbox,
   ErrorState,
@@ -10,14 +10,16 @@ import {
   adminKeys,
   hhmmToMinutes,
   minutesToHHMM,
+  useAdminLocations,
   useAdminServices,
   useAdminStaff,
+  type AdminLocation,
   type AdminStaff,
   type WorkingShift,
 } from '@/components/admin/common';
 import { useToast } from '@/components/providers';
 import { Button } from '@/components/ui/button';
-import { Input, Textarea, fieldErrors } from '@/components/ui/field';
+import { Input, Select, Textarea, fieldErrors } from '@/components/ui/field';
 import { Avatar, Badge, EmptyState, Modal, Skeleton } from '@/components/ui/misc';
 import { RequestError, api, errorMessage } from '@/lib/client';
 import { DAY_NAMES, cn, minutesToLabel } from '@/lib/format';
@@ -34,8 +36,20 @@ function hoursLabel(mins: number) {
 
 export default function AdminStaffPage() {
   const staff = useAdminStaff();
+  const locations = useAdminLocations();
   const [editing, setEditing] = useState<Editing>(null);
+  const [branch, setBranch] = useState('all');
   const editingMember = editing?.mode === 'edit' ? staff.data?.find(s => s.id === editing.id) : undefined;
+
+  const branchName = (id: string | null) => (id ? locations.data?.find(l => l.id === id)?.name : undefined);
+  const list = (staff.data ?? []).filter(m => branch === 'all' || (branch === 'none' ? !m.locationId : m.locationId === branch));
+  const branchFilters = locations.data?.length
+    ? [
+        { id: 'all', name: 'All' },
+        ...locations.data.map(l => ({ id: l.id, name: l.name })),
+        ...(staff.data?.some(m => !m.locationId) ? [{ id: 'none', name: 'Not assigned' }] : []),
+      ]
+    : [];
 
   return (
     <div className="space-y-6 animate-fade-up">
@@ -51,6 +65,32 @@ export default function AdminStaffPage() {
         }
       />
 
+      {branchFilters.length > 0 ? (
+        <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0" role="group" aria-label="Filter by branch">
+          {branchFilters.map(b => (
+            <button
+              key={b.id}
+              type="button"
+              aria-pressed={branch === b.id}
+              onClick={() => setBranch(b.id)}
+              className={cn(
+                'shrink-0 rounded-full border px-4 py-2 text-sm font-medium transition',
+                branch === b.id
+                  ? 'border-plum-900 bg-plum-900 text-white'
+                  : 'border-line bg-white text-plum-800 hover:border-plum-200 hover:bg-plum-50',
+              )}
+            >
+              {b.name}
+              {b.id !== 'all' ? (
+                <span className={cn('ml-1.5 text-xs', branch === b.id ? 'text-rose-300' : 'text-muted')}>
+                  {staff.data?.filter(m => (b.id === 'none' ? !m.locationId : m.locationId === b.id)).length ?? ''}
+                </span>
+              ) : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       {staff.isError ? (
         <ErrorState error={staff.error} onRetry={() => staff.refetch()} />
       ) : staff.isPending ? (
@@ -63,10 +103,19 @@ export default function AdminStaffPage() {
         <EmptyState icon={Users} title="No team members yet">
           Add your first stylist to start accepting bookings.
         </EmptyState>
+      ) : list.length === 0 ? (
+        <EmptyState icon={Users} title="No one here yet">
+          Assign team members to this branch from their profile.
+        </EmptyState>
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {staff.data.map(m => (
-            <StaffCard key={m.id} member={m} onEdit={() => setEditing({ mode: 'edit', id: m.id })} />
+          {list.map(m => (
+            <StaffCard
+              key={m.id}
+              member={m}
+              branchName={branchName(m.locationId)}
+              onEdit={() => setEditing({ mode: 'edit', id: m.id })}
+            />
           ))}
         </ul>
       )}
@@ -78,16 +127,16 @@ export default function AdminStaffPage() {
         wide={editing?.mode === 'edit'}
       >
         {editing?.mode === 'create' ? (
-          <ProfileForm onDone={() => setEditing(null)} />
+          <ProfileForm locations={locations.data} onDone={() => setEditing(null)} />
         ) : editingMember ? (
-          <EditMember key={editingMember.id} member={editingMember} onDone={() => setEditing(null)} />
+          <EditMember key={editingMember.id} member={editingMember} locations={locations.data} onDone={() => setEditing(null)} />
         ) : null}
       </Modal>
     </div>
   );
 }
 
-function StaffCard({ member: m, onEdit }: { member: AdminStaff; onEdit: () => void }) {
+function StaffCard({ member: m, branchName, onEdit }: { member: AdminStaff; branchName?: string; onEdit: () => void }) {
   const days = new Set(m.workingHours.map(h => h.dayOfWeek));
   const total = weeklyMinutes(m.workingHours);
   return (
@@ -100,6 +149,10 @@ function StaffCard({ member: m, onEdit }: { member: AdminStaff; onEdit: () => vo
             {m.isActive ? <Badge tone="success">Active</Badge> : <Badge>Inactive</Badge>}
           </div>
           <p className="truncate text-sm text-muted">{m.title}</p>
+          <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-muted">
+            <MapPin className="size-3.5 shrink-0" aria-hidden />
+            <span className="truncate">{branchName ?? 'No branch assigned'}</span>
+          </p>
           {m.email ? (
             <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-muted">
               <Mail className="size-3.5 shrink-0" aria-hidden />
@@ -154,7 +207,7 @@ const TABS = [
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
 
-function EditMember({ member, onDone }: { member: AdminStaff; onDone: () => void }) {
+function EditMember({ member, locations, onDone }: { member: AdminStaff; locations?: AdminLocation[]; onDone: () => void }) {
   const [tab, setTab] = useState<TabId>('profile');
   return (
     <div>
@@ -179,7 +232,7 @@ function EditMember({ member, onDone }: { member: AdminStaff; onDone: () => void
       </div>
       {/* Panels stay mounted so unsaved edits survive switching tabs. */}
       <div role="tabpanel" id="panel-profile" aria-labelledby="tab-profile" hidden={tab !== 'profile'}>
-        <ProfileForm member={member} onDone={onDone} />
+        <ProfileForm member={member} locations={locations} onDone={onDone} />
       </div>
       <div role="tabpanel" id="panel-services" aria-labelledby="tab-services" hidden={tab !== 'services'}>
         <ServicesForm member={member} onDone={onDone} />
@@ -213,13 +266,14 @@ function FormFooter({ onCancel, loading, label, error }: { onCancel: () => void;
 
 // ---------- Profile ----------
 
-function ProfileForm({ member, onDone }: { member?: AdminStaff; onDone: () => void }) {
+function ProfileForm({ member, locations, onDone }: { member?: AdminStaff; locations?: AdminLocation[]; onDone: () => void }) {
   const qc = useQueryClient();
   const toast = useToast();
   const [name, setName] = useState(member?.name ?? '');
   const [title, setTitle] = useState(member?.title ?? '');
   const [bio, setBio] = useState(member?.bio ?? '');
   const [avatarUrl, setAvatarUrl] = useState(member?.avatarUrl ?? '');
+  const [locationId, setLocationId] = useState(member?.locationId ?? '');
   const [isActive, setActive] = useState(member?.isActive ?? true);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState('');
@@ -230,6 +284,7 @@ function ProfileForm({ member, onDone }: { member?: AdminStaff; onDone: () => vo
     onSuccess: s => {
       toast(member ? 'Profile saved.' : `${s.name} added to the team. Set their services and hours next.`);
       qc.invalidateQueries({ queryKey: adminKeys.staff });
+      qc.invalidateQueries({ queryKey: adminKeys.locations });
       onDone();
     },
     onError: e => {
@@ -248,6 +303,7 @@ function ProfileForm({ member, onDone }: { member?: AdminStaff; onDone: () => vo
       title: title.trim(),
       bio: bio.trim() || null,
       avatarUrl: avatarUrl.trim() || null,
+      locationId: locationId || null,
       ...(member ? { isActive } : {}),
     });
   }
@@ -278,6 +334,23 @@ function ProfileForm({ member, onDone }: { member?: AdminStaff; onDone: () => vo
         error={errors.avatarUrl}
         onChange={e => setAvatarUrl(e.target.value)}
       />
+      <Select
+        label="Branch"
+        value={locationId}
+        error={errors.locationId}
+        hint="The location this team member works at."
+        onChange={e => setLocationId(e.target.value)}
+      >
+        <option value="">Not assigned</option>
+        {locations
+          ?.filter(l => l.isActive || l.id === locationId)
+          .map(l => (
+            <option key={l.id} value={l.id}>
+              {l.name}
+              {l.isActive ? '' : ' (inactive)'}
+            </option>
+          ))}
+      </Select>
       {member ? (
         <Checkbox
           label="Active"

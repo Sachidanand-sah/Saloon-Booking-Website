@@ -2,13 +2,14 @@
 
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarDays, CalendarX2, Clock, History, Star, UserRound } from 'lucide-react';
+import { CalendarDays, CalendarX2, Clock, History, MapPin, Star, UserRound } from 'lucide-react';
 import { useSession, useToast } from '@/components/providers';
 import { Button, ButtonLink } from '@/components/ui/button';
 import { Input, Textarea } from '@/components/ui/field';
 import { Avatar, EmptyState, Modal, Skeleton, StatusBadge } from '@/components/ui/misc';
 import { PageHeader } from '@/components/site/page-header';
 import { api, errorMessage } from '@/lib/client';
+import { directionsUrl, formatAddress } from '@/lib/maps';
 import { cn, formatDate, formatDuration, formatPrice, formatTime } from '@/lib/format';
 import type { Booking, SalonInfo, User } from '@/lib/types';
 
@@ -129,6 +130,14 @@ function BookingCard({ booking: b, tz, onCancel, onReview }: { booking: Booking;
           </span>
           <span className="font-medium text-plum-900">{formatPrice(b.price, b.currency)}</span>
         </p>
+        {b.location ? (
+          <p className="mt-1.5 flex items-start gap-1.5 text-sm text-muted">
+            <MapPin className="mt-0.5 size-4 shrink-0 text-rose-500" />
+            <a href={directionsUrl(b.location)} target="_blank" rel="noreferrer" className="hover:text-rose-600">
+              <span className="font-medium text-plum-900">{b.location.name}</span> · {formatAddress(b.location)}
+            </a>
+          </p>
+        ) : null}
         {b.notes ? <p className="mt-2 line-clamp-2 text-sm italic text-muted">“{b.notes}”</p> : null}
         {b.review ? (
           <p className="mt-3 inline-flex items-center gap-1 text-sm text-plum-700">
@@ -139,7 +148,7 @@ function BookingCard({ booking: b, tz, onCancel, onReview }: { booking: Booking;
         {b.canReschedule || b.canCancel || b.canReview || inactive || b.status === 'COMPLETED' ? (
           <div className="mt-5 flex flex-wrap gap-2 border-t border-line pt-4">
             {b.canReschedule ? (
-              <ButtonLink href={`/book?reschedule=${b.id}&service=${b.service.slug}&staff=${b.staff.id}`} variant="outline" size="sm">
+              <ButtonLink href={`/book?reschedule=${b.id}&service=${b.service.slug}&staff=${b.staff.id}${b.location ? `&location=${b.location.slug}` : ''}`} variant="outline" size="sm">
                 Reschedule
               </ButtonLink>
             ) : null}
@@ -154,7 +163,7 @@ function BookingCard({ booking: b, tz, onCancel, onReview }: { booking: Booking;
               </Button>
             ) : null}
             {inactive || b.status === 'COMPLETED' ? (
-              <ButtonLink href={`/book?service=${b.service.slug}`} variant="ghost" size="sm">
+              <ButtonLink href={`/book?service=${b.service.slug}${b.location ? `&location=${b.location.slug}` : ''}`} variant="ghost" size="sm">
                 Book again
               </ButtonLink>
             ) : null}
@@ -299,7 +308,7 @@ function ProfileCard({ user }: { user: User }) {
       {editing ? (
         <form onSubmit={onSubmit} className="mt-5 space-y-4">
           <Input label="Full name" name="name" defaultValue={user.name} required minLength={2} />
-          <Input label="Phone" name="phone" type="tel" defaultValue={user.phone ?? ''} placeholder="+1 555 000 0000" />
+          <Input label="Phone" name="phone" type="tel" defaultValue={user.phone ?? ''} placeholder="98XXXXXXXX" />
           <div className="flex gap-2">
             <Button type="submit" size="sm" loading={save.isPending}>Save</Button>
             <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
@@ -315,7 +324,7 @@ function ProfileCard({ user }: { user: User }) {
             <div className="flex justify-between gap-4">
               <dt className="text-muted">Member since</dt>
               <dd className="font-medium text-plum-900">
-                {new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                {new Date(user.createdAt).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
               </dd>
             </div>
           </dl>

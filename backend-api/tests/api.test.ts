@@ -234,3 +234,76 @@ describe('admin', () => {
     expect(bad.status).toBe(400);
   });
 });
+
+describe('branches', () => {
+  let branchA: string;
+  let branchB: string;
+  let staffB: string;
+
+  beforeAll(async () => {
+    branchA = (await prisma.location.create({ data: { slug: 'north', name: 'North', addressLine1: '1 North St', city: 'Town' } })).id;
+    branchB = (await prisma.location.create({ data: { slug: 'south', name: 'South', addressLine1: '2 South St', city: 'Town' } })).id;
+    await prisma.staff.update({ where: { id: staffId }, data: { locationId: branchA } });
+    staffB = (
+      await prisma.staff.create({
+        data: {
+          name: 'South Stylist',
+          title: 'Stylist',
+          locationId: branchB,
+          services: { create: { serviceId } },
+          workingHours: { create: [1, 2, 3, 4, 5, 6, 7].map(d => ({ dayOfWeek: d, startMinute: 540, endMinute: 720 })) },
+        },
+      })
+    ).id;
+  });
+
+  it('lists active branches with hours and team size', async () => {
+    const res = await request(app).get('/api/locations');
+    expect(res.status).toBe(200);
+    const south = res.body.find((l: { slug: string }) => l.slug === 'south');
+    expect(south).toMatchObject({ name: 'South', staffCount: 1, serviceIds: [serviceId] });
+    expect(south.openingHours).toHaveLength(7);
+  });
+
+  it('returns a branch with its team and services', async () => {
+    const res = await request(app).get('/api/locations/south');
+    expect(res.status).toBe(200);
+    expect(res.body.staff.map((s: { id: string }) => s.id)).toEqual([staffB]);
+    expect(res.body.services[0].id).toBe(serviceId);
+  });
+
+  it('limits availability to stylists at the chosen branch', async () => {
+    const res = await request(app).get('/api/availability').query({ serviceId, date, locationId: 'south' });
+    expect(res.status).toBe(200);
+    expect(res.body.staff.map((s: { id: string }) => s.id)).toEqual([staffB]);
+  });
+
+  it('records the branch on the booking', async () => {
+    const res = await request(app)
+      .post('/api/bookings')
+      .set(auth(customerToken))
+      .send({ serviceId, startAt: localTime('09:15'), locationId: branchB });
+    expect(res.status).toBe(201);
+    expect(res.body.booking.staff.id).toBe(staffB);
+    expect(res.body.booking.location).toMatchObject({ slug: 'south', addressLine1: '2 South St' });
+  });
+
+  it('hides deactivated branches and their stylists', async () => {
+    const off = await request(app).delete(`/api/admin/locations/${branchB}`).set(auth(adminToken));
+    expect(off.status).toBe(204);
+    expect((await request(app).get('/api/locations/south')).status).toBe(404);
+    const res = await request(app).get('/api/availability').query({ serviceId, date, locationId: 'south' });
+    expect(res.body.slots).toEqual([]);
+  });
+
+  it('lets admins create branches and rejects bad input', async () => {
+    const bad = await request(app).post('/api/admin/locations').set(auth(adminToken)).send({ name: 'X' });
+    expect(bad.status).toBe(400);
+    const ok = await request(app)
+      .post('/api/admin/locations')
+      .set(auth(adminToken))
+      .send({ name: 'East', slug: 'east', addressLine1: '3 East St', city: 'Town', latitude: 27.7, longitude: 85.3, imageUrl: '/images/branches/east.jpg' });
+    expect(ok.status).toBe(201);
+    expect(ok.body.imageUrl).toBe('/images/branches/east.jpg');
+  });
+});

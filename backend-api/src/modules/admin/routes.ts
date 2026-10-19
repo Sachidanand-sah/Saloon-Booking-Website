@@ -20,6 +20,11 @@ const slug = z
   .toLowerCase()
   .regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'use lowercase letters, numbers and dashes');
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'must be YYYY-MM-DD');
+/** Absolute https URL, or a path to an image bundled with the website (e.g. /images/services/cut.jpg). */
+const imageRef = z
+  .string()
+  .trim()
+  .refine(v => /^https?:\/\//.test(v) || /^\/[\w\-./]+$/.test(v), 'must be an image URL or a /path');
 const salonDay = (date?: string) =>
   date ? DateTime.fromISO(date, { zone: config.SALON_TIMEZONE }) : DateTime.now().setZone(config.SALON_TIMEZONE);
 
@@ -92,6 +97,7 @@ adminRouter.get('/bookings', async (req, res) => {
       to: isoDate.optional(),
       status: z.nativeEnum(BookingStatus).optional(),
       staffId: z.string().optional(),
+      locationId: z.string().optional(),
       q: z.string().trim().max(80).optional(),
       page: z.coerce.number().int().min(1).default(1),
       pageSize: z.coerce.number().int().min(1).max(200).default(50),
@@ -105,6 +111,7 @@ adminRouter.get('/bookings', async (req, res) => {
   };
   if (q.status) where.status = q.status;
   if (q.staffId) where.staffId = q.staffId;
+  if (q.locationId) where.locationId = q.locationId;
   if (q.q) {
     where.customer = {
       OR: [
@@ -118,7 +125,7 @@ adminRouter.get('/bookings', async (req, res) => {
     prisma.booking.count({ where }),
     prisma.booking.findMany({
       where,
-      include: { service: true, staff: true, customer: true, review: true },
+      include: { service: true, staff: true, customer: true, review: true, location: true },
       orderBy: { startAt: 'asc' },
       skip: (q.page - 1) * q.pageSize,
       take: q.pageSize,
@@ -137,7 +144,7 @@ adminRouter.patch('/bookings/:id', async (req, res) => {
       status: data.status,
       cancelledAt: data.status === BookingStatus.CANCELLED ? (existing.cancelledAt ?? new Date()) : null,
     },
-    include: { service: true, staff: true, customer: true, review: true },
+    include: { service: true, staff: true, customer: true, review: true, location: true },
   });
   res.json({ booking: serialize.booking(booking) });
 });
@@ -168,9 +175,9 @@ const serviceInput = z.object({
   slug,
   description: z.string().trim().min(10).max(1000),
   durationMins: z.number().int().min(5).max(480),
-  price: z.number().min(0).max(100_000),
+  price: z.number().min(0).max(10_000_000),
   categoryId: z.string().min(1),
-  imageUrl: z.string().url().nullable().optional(),
+  imageUrl: imageRef.nullable().optional(),
   isFeatured: z.boolean().optional(),
   isActive: z.boolean().optional(),
   staffIds: z.array(z.string()).optional(),
@@ -225,7 +232,8 @@ const staffInput = z.object({
   name: z.string().trim().min(2).max(80),
   title: z.string().trim().min(2).max(80),
   bio: z.string().trim().max(1000).nullable().optional(),
-  avatarUrl: z.string().url().nullable().optional(),
+  avatarUrl: imageRef.nullable().optional(),
+  locationId: z.string().nullable().optional(),
   isActive: z.boolean().optional(),
   userId: z.string().nullable().optional(),
 });
@@ -290,6 +298,48 @@ adminRouter.put('/staff/:id/services', async (req, res) => {
     prisma.staffService.createMany({ data: serviceIds.map(serviceId => ({ serviceId, staffId: req.params.id })) }),
   ]);
   res.json({ serviceIds });
+});
+
+// ---------- Branches ----------
+
+const locationInput = z.object({
+  name: z.string().trim().min(2).max(80),
+  slug,
+  description: z.string().trim().max(600).nullable().optional(),
+  addressLine1: z.string().trim().min(3).max(120),
+  addressLine2: z.string().trim().max(120).nullable().optional(),
+  city: z.string().trim().min(2).max(80),
+  phone: z.string().trim().max(30).nullable().optional(),
+  email: z.string().trim().email().nullable().optional(),
+  latitude: z.number().min(-90).max(90).nullable().optional(),
+  longitude: z.number().min(-180).max(180).nullable().optional(),
+  imageUrl: imageRef.nullable().optional(),
+  isActive: z.boolean().optional(),
+  sortOrder: z.number().int().optional(),
+});
+
+adminRouter.get('/locations', async (_req, res) => {
+  const locations = await prisma.location.findMany({
+    include: { _count: { select: { staff: { where: { isActive: true } } } } },
+    orderBy: [{ isActive: 'desc' }, { sortOrder: 'asc' }, { name: 'asc' }],
+  });
+  res.json(locations.map(l => ({ ...serialize.location(l), sortOrder: l.sortOrder, staffCount: l._count.staff })));
+});
+
+adminRouter.post('/locations', async (req, res) => {
+  const location = await prisma.location.create({ data: body(req, locationInput) });
+  res.status(201).json(serialize.location(location));
+});
+
+adminRouter.patch('/locations/:id', async (req, res) => {
+  const location = await prisma.location.update({ where: { id: req.params.id }, data: body(req, locationInput.partial()) });
+  res.json(serialize.location(location));
+});
+
+/** Soft delete: bookings keep their branch; stylists stay assigned until moved. */
+adminRouter.delete('/locations/:id', async (req, res) => {
+  await prisma.location.update({ where: { id: req.params.id }, data: { isActive: false } });
+  res.status(204).end();
 });
 
 // ---------- Customers ----------

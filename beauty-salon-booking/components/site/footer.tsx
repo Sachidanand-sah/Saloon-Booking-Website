@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Mail, MapPin, Phone } from 'lucide-react';
 import { DAY_NAMES, minutesToLabel } from '@/lib/format';
 import { site } from '@/lib/site';
-import type { OpeningHours } from '@/lib/types';
+import type { Location, OpeningHours } from '@/lib/types';
 import { Logo } from './header';
 
 export function HoursList({ hours, className }: { hours: OpeningHours[]; className?: string }) {
@@ -20,7 +20,7 @@ export function HoursList({ hours, className }: { hours: OpeningHours[]; classNa
   );
 }
 
-export function SiteFooter({ hours }: { hours: OpeningHours[] | null }) {
+export function SiteFooter({ hours, branches }: { hours: OpeningHours[] | null; branches: Location[] | null }) {
   return (
     <footer className="bg-plum-900 text-white/75">
       <div className="container-page grid gap-12 py-16 sm:grid-cols-2 lg:grid-cols-4">
@@ -36,20 +36,22 @@ export function SiteFooter({ hours }: { hours: OpeningHours[] | null }) {
             <li><Link className="hover:text-white" href="/book">Book an appointment</Link></li>
             <li><Link className="hover:text-white" href="/account">My bookings</Link></li>
             <li><Link className="hover:text-white" href="/#team">Meet the team</Link></li>
+            <li><Link className="hover:text-white" href="/locations">Our locations</Link></li>
           </ul>
         </div>
 
         <div>
           <h3 className="font-sans text-sm font-semibold uppercase tracking-widest text-white">Contact</h3>
           <ul className="mt-4 space-y-3 text-sm">
-            <li className="flex gap-3">
-              <MapPin className="size-4 shrink-0 text-rose-300" />
-              <a href={site.mapUrl} target="_blank" rel="noreferrer" className="hover:text-white">
-                {site.address.line1}, {site.address.line2}
-                <br />
-                {site.address.city}
-              </a>
-            </li>
+            {(branches ?? []).map(b => (
+              <li key={b.id} className="flex gap-3">
+                <MapPin className="size-4 shrink-0 text-rose-300" />
+                <Link href={`/locations/${b.slug}`} className="hover:text-white">
+                  <span className="block font-medium text-white/90">{b.name}</span>
+                  {b.addressLine1}, {b.city}
+                </Link>
+              </li>
+            ))}
             <li className="flex gap-3">
               <Phone className="size-4 shrink-0 text-rose-300" />
               <a href={`tel:${site.phone.replace(/[^+\d]/g, '')}`} className="hover:text-white">{site.phone}</a>

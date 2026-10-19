@@ -1,4 +1,4 @@
-/** Shapes returned by the Lovely Glow API (backend-api). */
+/** Shapes returned by the Lalima Beauty API (backend-api). */
 
 export type Role = 'CUSTOMER' | 'STAFF' | 'ADMIN';
 export type BookingStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED' | 'NO_SHOW';
@@ -14,7 +14,36 @@ export type User = {
 
 export type Category = { id: string; slug: string; name: string; description: string | null; serviceCount?: number };
 
-export type StaffSummary = { id: string; name: string; title: string; bio: string | null; avatarUrl: string | null };
+export type StaffSummary = {
+  id: string;
+  name: string;
+  title: string;
+  bio: string | null;
+  avatarUrl: string | null;
+  locationId: string | null;
+};
+
+export type Location = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string;
+  phone: string | null;
+  email: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  imageUrl: string | null;
+  isActive: boolean;
+};
+
+/** GET /locations item. */
+export type LocationListItem = Location & { staffCount: number; serviceIds: string[]; openingHours: OpeningHours[] };
+
+/** GET /locations/:slug. */
+export type LocationDetail = Location & { openingHours: OpeningHours[]; staff: StaffSummary[]; services: Service[] };
 
 export type Service = {
   id: string;
@@ -32,7 +61,10 @@ export type Service = {
   staff?: StaffSummary[];
 };
 
-export type Staff = StaffSummary & { services: { id: string; name: string }[] };
+export type Staff = StaffSummary & {
+  services: { id: string; name: string }[];
+  location: { id: string; slug: string; name: string } | null;
+};
 
 export type OpeningHours = { dayOfWeek: number; open: number | null; close: number | null };
 
@@ -42,6 +74,7 @@ export type SalonInfo = {
   slotStepMins: number;
   bookingWindowDays: number;
   cancelCutoffMins: number;
+  locationCount: number;
   openingHours: OpeningHours[];
 };
 
@@ -80,6 +113,7 @@ export type Booking = {
   canReview: boolean;
   service: { id: string; slug: string; name: string; durationMins: number };
   staff: StaffSummary;
+  location: Location | null;
   customer?: { id: string; name: string; email: string; phone: string | null };
   review: { rating: number; comment: string | null } | null;
 };

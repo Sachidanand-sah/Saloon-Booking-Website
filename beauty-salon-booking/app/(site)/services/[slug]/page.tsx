@@ -1,13 +1,14 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, ArrowRight, CalendarCheck, Clock, ShieldCheck, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CalendarCheck, Clock, MapPin, ShieldCheck, Sparkles } from 'lucide-react';
 import { ButtonLink } from '@/components/ui/button';
 import { Avatar, ServiceArt, Stars } from '@/components/ui/misc';
 import { ServiceCard } from '@/components/site/service-card';
 import { getPublic } from '@/lib/server/api';
 import { formatDuration, formatPrice } from '@/lib/format';
-import type { Review, SalonInfo, Service } from '@/lib/types';
+import type { LocationListItem, Review, SalonInfo, Service } from '@/lib/types';
+import { formatAddress } from '@/lib/maps';
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -25,11 +26,13 @@ export default async function ServicePage({ params }: Props) {
   const service = await getPublic<Service>(`/services/${slug}`);
   if (!service) notFound();
 
-  const [reviews, related, salon] = await Promise.all([
+  const [reviews, related, salon, branches] = await Promise.all([
     getPublic<Review[]>(`/reviews?serviceId=${service.id}&limit=3`),
     service.category ? getPublic<Service[]>(`/services?category=${service.category.slug}`) : null,
     getPublic<SalonInfo>('/salon', 300),
+    getPublic<LocationListItem[]>('/locations', 300),
   ]);
+  const offeredAt = (branches ?? []).filter(b => b.serviceIds.includes(service.id));
   const others = (related ?? []).filter(s => s.id !== service.id).slice(0, 3);
   const cutoffHours = salon ? Math.round(salon.cancelCutoffMins / 60) : null;
 
@@ -98,6 +101,28 @@ export default async function ServicePage({ params }: Props) {
                             <span className="text-xs text-muted">{m.title}</span>
                           </span>
                           <ArrowRight className="size-4 text-muted transition group-hover:translate-x-0.5 group-hover:text-rose-500" />
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {offeredAt.length > 1 ? (
+                <div className="card mt-4 p-6">
+                  <h2 className="font-sans text-sm font-semibold uppercase tracking-widest text-plum-900">Available at</h2>
+                  <ul className="mt-4 space-y-3">
+                    {offeredAt.map(b => (
+                      <li key={b.id}>
+                        <Link
+                          href={`/book?location=${b.slug}&service=${service.slug}`}
+                          className="group -m-2 flex items-start gap-3 rounded-xl p-2 hover:bg-ivory"
+                        >
+                          <MapPin className="mt-0.5 size-4 shrink-0 text-rose-500" />
+                          <span className="flex-1">
+                            <span className="block font-medium text-plum-900">{b.name}</span>
+                            <span className="text-xs text-muted">{formatAddress(b)}</span>
+                          </span>
+                          <ArrowRight className="mt-0.5 size-4 text-muted transition group-hover:translate-x-0.5 group-hover:text-rose-500" />
                         </Link>
                       </li>
                     ))}

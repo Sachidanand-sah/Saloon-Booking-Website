@@ -2,12 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { CalendarDays, ChevronLeft, ChevronRight, Mail, Phone, Search } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Mail, MapPin, Phone, Search } from 'lucide-react';
 import {
   ErrorState,
   PageHeader,
   STATUSES,
   adminKeys,
+  useAdminLocations,
   useAdminStaff,
   useSalon,
   useUpdateBookingStatus,
@@ -47,6 +48,7 @@ function BookingsView({ timeZone }: { timeZone: string }) {
   const [to, setTo] = useState(() => addDays(todayIn(timeZone), 7));
   const [status, setStatus] = useState<BookingStatus | ''>('');
   const [staffId, setStaffId] = useState('');
+  const [locationId, setLocationId] = useState('');
   const [search, setSearch] = useState('');
   const [q, setQ] = useState('');
   const [page, setPage] = useState(1);
@@ -61,12 +63,14 @@ function BookingsView({ timeZone }: { timeZone: string }) {
   }, [search]);
 
   const staff = useAdminStaff();
+  const locations = useAdminLocations();
 
   const params = new URLSearchParams({ page: String(page), pageSize: String(PAGE_SIZE) });
   if (from) params.set('from', from);
   if (to) params.set('to', to);
   if (status) params.set('status', status);
   if (staffId) params.set('staffId', staffId);
+  if (locationId) params.set('locationId', locationId);
   if (q) params.set('q', q);
   const qs = params.toString();
 
@@ -85,7 +89,7 @@ function BookingsView({ timeZone }: { timeZone: string }) {
 
   return (
     <>
-      <div className="card grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-[1fr_1fr_1fr_1fr_1.5fr]">
+      <div className="card grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-3 xl:grid-cols-[1fr_1fr_1fr_1fr_1fr_1.5fr]">
         <Input label="From" type="date" value={from} max={to || undefined} onChange={e => reset(setFrom)(e.target.value)} />
         <Input label="To" type="date" value={to} min={from || undefined} onChange={e => reset(setTo)(e.target.value)} />
         <Select label="Status" value={status} onChange={e => reset(setStatus)(e.target.value as BookingStatus | '')}>
@@ -101,6 +105,15 @@ function BookingsView({ timeZone }: { timeZone: string }) {
           {staff.data?.map(s => (
             <option key={s.id} value={s.id}>
               {s.name}
+            </option>
+          ))}
+        </Select>
+        <Select label="Branch" value={locationId} onChange={e => reset(setLocationId)(e.target.value)}>
+          <option value="">All branches</option>
+          {locations.data?.map(l => (
+            <option key={l.id} value={l.id}>
+              {l.name}
+              {l.isActive ? '' : ' (inactive)'}
             </option>
           ))}
         </Select>
@@ -169,6 +182,12 @@ function BookingsView({ timeZone }: { timeZone: string }) {
                         <Avatar name={b.staff.name} src={b.staff.avatarUrl} className="size-7 text-[0.65rem]" />
                         {b.staff.name}
                       </span>
+                      {b.location ? (
+                        <p className="mt-1 flex items-center gap-1 whitespace-nowrap text-xs text-muted">
+                          <MapPin className="size-3.5 shrink-0" aria-hidden />
+                          {b.location.name}
+                        </p>
+                      ) : null}
                     </td>
                     <td className="whitespace-nowrap px-5 py-4 text-right font-medium text-plum-900">
                       {formatPrice(b.price, b.currency)}
@@ -204,7 +223,10 @@ function BookingsView({ timeZone }: { timeZone: string }) {
                 <div className="mt-3 flex items-center justify-between gap-3 text-sm">
                   <div className="min-w-0">
                     <p className="truncate font-medium text-plum-900">{b.service.name}</p>
-                    <p className="truncate text-muted">with {b.staff.name}</p>
+                    <p className="truncate text-muted">
+                      with {b.staff.name}
+                      {b.location ? ` · ${b.location.name}` : ''}
+                    </p>
                   </div>
                   <p className="shrink-0 font-semibold text-plum-900">{formatPrice(b.price, b.currency)}</p>
                 </div>

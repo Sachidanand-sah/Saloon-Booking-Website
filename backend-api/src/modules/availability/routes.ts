@@ -12,6 +12,7 @@ availabilityRouter.get('/', async (req, res) => {
       serviceId: z.string().min(1),
       date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'must be YYYY-MM-DD'),
       staffId: z.string().min(1).optional(),
+      locationId: z.string().min(1).optional(),
     }),
   );
   res.json(await getAvailability(q));

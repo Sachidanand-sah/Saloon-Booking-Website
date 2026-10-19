@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
@@ -10,6 +10,7 @@ import {
   Check,
   ChevronRight,
   Clock,
+  MapPin,
   Moon,
   Sun,
   Sunrise,
@@ -32,14 +33,29 @@ import {
   isoWeekday,
   todayIn,
 } from '@/lib/format';
-import type { Availability, Booking, Category, SalonInfo, Service, Staff } from '@/lib/types';
+import { formatAddress, todayHours } from '@/lib/maps';
+import { BranchPhoto } from '@/components/site/branch-card';
+import type { Availability, Booking, Category, LocationListItem, SalonInfo, Service, Staff } from '@/lib/types';
 
-type Props = { services: Service[]; categories: Category[]; staff: Staff[]; salon: SalonInfo };
+type Props = {
+  services: Service[];
+  categories: Category[];
+  staff: Staff[];
+  salon: SalonInfo;
+  branches: LocationListItem[];
+};
 
-const STEPS = ['Treatment', 'Specialist', 'Date & time', 'Confirm'] as const;
+type StepKey = 'branch' | 'service' | 'staff' | 'time' | 'confirm';
+const STEP_LABELS: Record<StepKey, string> = {
+  branch: 'Branch',
+  service: 'Treatment',
+  staff: 'Specialist',
+  time: 'Date & time',
+  confirm: 'Confirm',
+};
 const ANY = 'any';
 
-export function BookingWizard({ services, categories, staff, salon }: Props) {
+export function BookingWizard({ services, categories, staff, salon, branches }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -52,38 +68,52 @@ export function BookingWizard({ services, categories, staff, salon }: Props) {
   const date = params.get('date');
   const slot = params.get('slot');
   const rescheduleId = params.get('reschedule');
+  const requestedStaff = staffParam && staffParam !== ANY ? staff.find(m => m.id === staffParam) : undefined;
+
+  // With several branches the customer picks one first; a pre-chosen stylist implies their branch.
+  const multiBranch = branches.length > 1;
+  const branch =
+    branches.find(b => b.slug === params.get('location') || b.id === params.get('location')) ??
+    (requestedStaff ? branches.find(b => b.id === requestedStaff.locationId) : undefined) ??
+    (multiBranch ? undefined : branches[0]);
 
   const stylists = useMemo(
-    () => (service ? staff.filter(m => m.services.some(s => s.id === service.id)) : []),
-    [service, staff],
+    () =>
+      service
+        ? staff.filter(m => m.services.some(s => s.id === service.id) && (!branch || m.locationId === branch.id))
+        : [],
+    [service, staff, branch],
   );
-  const chosenStaff = staffParam && staffParam !== ANY ? staff.find(m => m.id === staffParam) : undefined;
+  const branchServices = branch ? services.filter(s => branch.serviceIds.includes(s.id)) : services;
+
+  // When only one specialist offers the service there is nothing to choose, so that step is skipped.
+  const onlyStylist = service && !staffParam && stylists.length === 1 ? stylists[0] : undefined;
+  const chosenStaff = requestedStaff ?? onlyStylist;
+  const staffDecided = !!staffParam || !!onlyStylist;
 
   // The step is derived from what has been chosen so far, so links and the back button just work.
-  const step = !service ? 0 : !staffParam ? 1 : !slot ? 2 : 3;
+  const stepKeys: StepKey[] = multiBranch ? ['branch', 'service', 'staff', 'time', 'confirm'] : ['service', 'staff', 'time', 'confirm'];
+  const current: StepKey =
+    multiBranch && !branch ? 'branch' : !service ? 'service' : !staffDecided ? 'staff' : !slot ? 'time' : 'confirm';
+  const step = stepKeys.indexOf(current);
 
-  const go = (changes: Record<string, string | null>, replace = false) => {
+  const go = (changes: Record<string, string | null>) => {
     const next = new URLSearchParams(params.toString());
     for (const [k, v] of Object.entries(changes)) {
       if (v === null) next.delete(k);
       else next.set(k, v);
     }
-    router[replace ? 'replace' : 'push'](`${pathname}?${next.toString()}`, { scroll: false });
+    router.push(`${pathname}?${next.toString()}`, { scroll: false });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // When only one specialist offers the service there is nothing to choose, so skip step 2.
-  // replace() rather than push() keeps the back button from bouncing into this redirect.
-  useEffect(() => {
-    if (service && !staffParam && stylists.length === 1) go({ staff: stylists[0].id }, true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [service?.id, staffParam, stylists.length]);
-
-  const backTo = (target: number) => {
-    if (target === 0) go({ service: null, staff: rescheduleId ? staffParam : null, date: null, slot: null });
-    if (target === 1) go({ staff: null, slot: null });
-    if (target === 2) go({ slot: null });
+  const backTo = (target: StepKey) => {
+    if (target === 'branch') go({ location: null, service: null, staff: null, date: null, slot: null });
+    if (target === 'service') go({ service: null, staff: rescheduleId ? staffParam : null, date: null, slot: null });
+    if (target === 'staff') go({ staff: null, slot: null });
+    if (target === 'time') go({ slot: null });
   };
+  const canGoBackTo = (key: StepKey) => !(rescheduleId && (key === 'branch' || key === 'service'));
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -92,43 +122,59 @@ export function BookingWizard({ services, categories, staff, salon }: Props) {
         <h1 className="mt-2 text-3xl sm:text-4xl">{rescheduleId ? 'Choose a new time' : 'Book your appointment'}</h1>
       </div>
 
-      <Stepper step={step} onSelect={i => i < step && !(rescheduleId && i === 0) && backTo(i)} />
+      <Stepper
+        labels={stepKeys.map(k => STEP_LABELS[k])}
+        step={step}
+        onSelect={i => i < step && canGoBackTo(stepKeys[i]) && backTo(stepKeys[i])}
+      />
 
       <div className="mt-8 grid gap-8 lg:grid-cols-[1fr_340px]">
         <div className="min-w-0">
-          {step === 0 ? (
+          {current === 'branch' ? (
+            <BranchStep branches={branches} timeZone={salon.timezone} onPick={b => go({ location: b.slug })} />
+          ) : null}
+          {current === 'service' ? (
             <ServiceStep
-              services={chosenStaff ? services.filter(s => chosenStaff.services.some(x => x.id === s.id)) : services}
+              services={chosenStaff ? branchServices.filter(s => chosenStaff.services.some(x => x.id === s.id)) : branchServices}
               categories={categories}
               forStaff={chosenStaff}
+              branch={multiBranch ? branch : undefined}
               onPick={s => go({ service: s.slug })}
+              onBack={multiBranch && !chosenStaff ? () => backTo('branch') : undefined}
             />
           ) : null}
-          {step === 1 && service ? (
-            <StaffStep stylists={stylists} onPick={id => go({ staff: id })} onBack={() => backTo(0)} hideBack={!!rescheduleId} />
+          {current === 'staff' && service ? (
+            <StaffStep
+              stylists={stylists}
+              onPick={id => go({ staff: id })}
+              onBack={() => backTo('service')}
+              hideBack={!!rescheduleId}
+            />
           ) : null}
-          {step === 2 && service ? (
+          {current === 'time' && service ? (
             <TimeStep
               service={service}
               staffId={chosenStaff?.id}
+              locationId={branch?.id}
               salon={salon}
               date={date}
               onDate={d => go({ date: d })}
               onPick={s => go({ slot: s })}
-              onBack={() => backTo(stylists.length > 1 ? 1 : 0)}
+              onBack={() => backTo(stylists.length > 1 ? 'staff' : 'service')}
             />
           ) : null}
-          {step === 3 && service && slot ? (
+          {current === 'confirm' && service && slot ? (
             <ConfirmStep
               service={service}
               staff={chosenStaff}
+              branch={branch}
               slot={slot}
               salon={salon}
               signedIn={!!user}
               sessionLoading={sessionLoading}
               rescheduleId={rescheduleId}
               currentUrl={`${pathname}?${params.toString()}`}
-              onBack={() => backTo(2)}
+              onBack={() => backTo('time')}
               onConflict={msg => {
                 toast(msg, 'error');
                 qc.invalidateQueries({ queryKey: ['availability'] });
@@ -147,7 +193,14 @@ export function BookingWizard({ services, categories, staff, salon }: Props) {
           ) : null}
         </div>
 
-        <Summary service={service} staff={chosenStaff} anyStaff={staffParam === ANY} slot={slot} salon={salon} />
+        <Summary
+          service={service}
+          staff={chosenStaff}
+          anyStaff={staffParam === ANY}
+          slot={slot}
+          salon={salon}
+          branch={multiBranch ? branch : undefined}
+        />
       </div>
     </div>
   );
@@ -155,10 +208,10 @@ export function BookingWizard({ services, categories, staff, salon }: Props) {
 
 // ---------------------------------------------------------------------------
 
-function Stepper({ step, onSelect }: { step: number; onSelect: (i: number) => void }) {
+function Stepper({ labels, step, onSelect }: { labels: string[]; step: number; onSelect: (i: number) => void }) {
   return (
     <ol className="flex items-center gap-2 sm:gap-3" aria-label="Booking progress">
-      {STEPS.map((label, i) => (
+      {labels.map((label, i) => (
         <li key={label} className="flex flex-1 items-center gap-2 sm:gap-3">
           <button
             type="button"
@@ -181,7 +234,7 @@ function Stepper({ step, onSelect }: { step: number; onSelect: (i: number) => vo
               {label}
             </span>
           </button>
-          {i < STEPS.length - 1 ? <span className={cn('h-px flex-1', i < step ? 'bg-rose-300' : 'bg-line')} /> : null}
+          {i < labels.length - 1 ? <span className={cn('h-px flex-1', i < step ? 'bg-rose-300' : 'bg-line')} /> : null}
         </li>
       ))}
     </ol>
@@ -203,18 +256,68 @@ function StepCard({ title, subtitle, onBack, children }: { title: string; subtit
   );
 }
 
-// ---------- Step 1: service ----------
+// ---------- Step: branch ----------
+
+function BranchStep({
+  branches,
+  timeZone,
+  onPick,
+}: {
+  branches: LocationListItem[];
+  timeZone: string;
+  onPick: (b: LocationListItem) => void;
+}) {
+  return (
+    <StepCard title="Choose a branch" subtitle="Pick the studio that's most convenient for you.">
+      <ul className="grid gap-3">
+        {branches.map(b => {
+          const today = todayHours(b.openingHours, timeZone);
+          return (
+            <li key={b.id}>
+              <button
+                onClick={() => onPick(b)}
+                className="group flex w-full items-center gap-4 rounded-2xl border border-line bg-white p-3 text-left transition hover:border-rose-300 hover:shadow-soft sm:p-4"
+              >
+                <BranchPhoto src={b.imageUrl} name={b.name} className="size-20 shrink-0 rounded-xl" />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-display text-lg font-semibold text-plum-900">{b.name}</span>
+                  <span className="mt-0.5 flex items-start gap-1.5 text-sm text-muted">
+                    <MapPin className="mt-0.5 size-3.5 shrink-0" /> {formatAddress(b)}
+                  </span>
+                  <span className={cn('mt-1 block text-xs', today.open ? 'text-success' : 'text-muted')}>{today.label}</span>
+                </span>
+                <ChevronRight className="size-5 shrink-0 text-muted transition group-hover:translate-x-0.5 group-hover:text-rose-500" />
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="mt-5 text-sm text-muted">
+        Not sure which is closest?{' '}
+        <Link href="/locations" className="font-medium text-rose-600 hover:underline">
+          See all branches on the map
+        </Link>
+      </p>
+    </StepCard>
+  );
+}
+
+// ---------- Step: service ----------
 
 function ServiceStep({
   services,
   categories,
   forStaff,
+  branch,
   onPick,
+  onBack,
 }: {
   services: Service[];
   categories: Category[];
   forStaff?: Staff;
+  branch?: LocationListItem;
   onPick: (s: Service) => void;
+  onBack?: () => void;
 }) {
   const [cat, setCat] = useState('all');
   const usedCats = categories.filter(c => services.some(s => s.category?.slug === c.slug));
@@ -223,7 +326,14 @@ function ServiceStep({
   return (
     <StepCard
       title="Choose a treatment"
-      subtitle={forStaff ? `Treatments offered by ${forStaff.name}` : 'Select the service you would like to book.'}
+      subtitle={
+        forStaff
+          ? `Treatments offered by ${forStaff.name}`
+          : branch
+            ? `Treatments available at ${branch.name}`
+            : 'Select the service you would like to book.'
+      }
+      onBack={onBack}
     >
       <div className="no-scrollbar -mx-1 mb-5 flex gap-2 overflow-x-auto px-1 pb-1">
         {[{ slug: 'all', name: 'All' }, ...usedCats].map(c => (
@@ -313,6 +423,7 @@ const periods: { label: string; icon: LucideIcon; test: (h: number) => boolean }
 function TimeStep({
   service,
   staffId,
+  locationId,
   salon,
   date,
   onDate,
@@ -321,6 +432,7 @@ function TimeStep({
 }: {
   service: Service;
   staffId?: string;
+  locationId?: string;
   salon: SalonInfo;
   date: string | null;
   onDate: (d: string) => void;
@@ -340,10 +452,12 @@ function TimeStep({
   const selected = date && days.includes(date) ? date : days.find(d => !isClosed(d)) ?? today;
 
   const { data, isPending, isError, refetch } = useQuery({
-    queryKey: ['availability', service.id, staffId ?? ANY, selected],
+    queryKey: ['availability', service.id, staffId ?? ANY, locationId ?? 'all', selected],
     queryFn: () =>
       api.get<Availability>(
-        `/availability?serviceId=${service.id}&date=${selected}${staffId ? `&staffId=${staffId}` : ''}`,
+        `/availability?serviceId=${service.id}&date=${selected}` +
+          (staffId ? `&staffId=${staffId}` : '') +
+          (locationId ? `&locationId=${locationId}` : ''),
       ),
   });
 
@@ -441,6 +555,7 @@ function TimeStep({
 function ConfirmStep({
   service,
   staff,
+  branch,
   slot,
   salon,
   signedIn,
@@ -453,6 +568,7 @@ function ConfirmStep({
 }: {
   service: Service;
   staff?: Staff;
+  branch?: LocationListItem;
   slot: string;
   salon: SalonInfo;
   signedIn: boolean;
@@ -478,6 +594,7 @@ function ConfirmStep({
         : await api.post<{ booking: Booking }>('/bookings', {
             serviceId: service.id,
             staffId: staff?.id,
+            locationId: branch?.id,
             startAt: slot,
             notes: notes.trim() || undefined,
           });
@@ -501,6 +618,14 @@ function ConfirmStep({
         <p className="mt-3 text-sm text-muted">
           {service.name} · {staff ? `with ${staff.name}` : 'first available specialist'}
         </p>
+        {branch ? (
+          <p className="mt-1 flex items-start gap-1.5 text-sm text-muted">
+            <MapPin className="mt-0.5 size-4 shrink-0 text-rose-500" />
+            <span>
+              <span className="font-medium text-plum-900">{branch.name}</span> · {formatAddress(branch)}
+            </span>
+          </p>
+        ) : null}
       </div>
 
       {sessionLoading ? (
@@ -549,12 +674,14 @@ function Summary({
   anyStaff,
   slot,
   salon,
+  branch,
 }: {
   service?: Service;
   staff?: Staff;
   anyStaff: boolean;
   slot: string | null;
   salon: SalonInfo;
+  branch?: LocationListItem;
 }) {
   return (
     <aside className="lg:sticky lg:top-28 lg:self-start">
@@ -565,6 +692,7 @@ function Summary({
         <div className="p-6">
           <h2 className="font-sans text-sm font-semibold uppercase tracking-widest text-plum-900">Your appointment</h2>
           <dl className="mt-5 space-y-4 text-sm">
+            {salon.locationCount > 1 ? <Row label="Branch" value={branch?.name} /> : null}
             <Row label="Treatment" value={service?.name} />
             <Row label="Specialist" value={staff?.name ?? (anyStaff ? 'First available' : undefined)} />
             <Row

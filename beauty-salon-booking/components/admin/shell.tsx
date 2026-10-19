@@ -3,23 +3,25 @@
 import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { CalendarDays, ExternalLink, LayoutDashboard, LogOut, Menu, Scissors, Users, X, type LucideIcon } from 'lucide-react';
+import { CalendarDays, ExternalLink, LayoutDashboard, LogOut, MapPin, Menu, Scissors, Users, X, type LucideIcon } from 'lucide-react';
 import { useSession, useToast } from '@/components/providers';
 import { Avatar } from '@/components/ui/misc';
 import { errorMessage } from '@/lib/client';
 import { cn } from '@/lib/format';
+import { site } from '@/lib/site';
 
 const NAV: { href: string; label: string; icon: LucideIcon }[] = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/bookings', label: 'Bookings', icon: CalendarDays },
   { href: '/admin/services', label: 'Services', icon: Scissors },
   { href: '/admin/staff', label: 'Team', icon: Users },
+  { href: '/admin/branches', label: 'Branches', icon: MapPin },
 ];
 
 function Brand() {
   return (
     <Link href="/admin" className="flex items-center gap-2.5">
-      <span className="font-display text-2xl font-semibold text-plum-900">Lovely Glow</span>
+      <span className="font-display text-2xl font-semibold text-plum-900">{site.name}</span>
       <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-rose-600">
         Admin
       </span>

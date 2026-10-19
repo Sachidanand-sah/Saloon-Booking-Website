@@ -3,7 +3,7 @@ import { createApp } from './app';
 import { prisma } from './lib/prisma';
 
 const server = createApp().listen(config.PORT, '0.0.0.0', () => {
-  console.log(`Lovely Glow API listening on http://localhost:${config.PORT} (${config.NODE_ENV})`);
+  console.log(`Lalima Beauty API listening on http://localhost:${config.PORT} (${config.NODE_ENV})`);
 });
 
 async function shutdown() {

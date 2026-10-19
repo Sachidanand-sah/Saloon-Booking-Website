@@ -1,7 +1,7 @@
 import 'server-only';
 import { cookies } from 'next/headers';
 import type { Role, User } from '../types';
-import { API_URL } from './api';
+import { API_URL, forwardedFor } from './api';
 
 /**
  * Tokens live in httpOnly cookies so page scripts can never read them. The browser talks
@@ -50,12 +50,17 @@ async function refresh(): Promise<string | null> {
 export async function authedFetch(path: string, init: RequestInit = {}) {
   const jar = await cookies();
   let token = jar.get(COOKIE.access)?.value ?? (await refresh());
+  const ipHeader = await forwardedFor();
 
   const send = (t: string | null) =>
     fetch(`${API_URL}${path}`, {
       ...init,
       cache: 'no-store',
-      headers: { ...(init.headers as Record<string, string>), ...(t ? { Authorization: `Bearer ${t}` } : {}) },
+      headers: {
+        ...(init.headers as Record<string, string>),
+        ...ipHeader,
+        ...(t ? { Authorization: `Bearer ${t}` } : {}),
+      },
     });
 
   let res = await send(token);

@@ -120,7 +120,7 @@ export function ServiceArt({
 }) {
   if (imageUrl) {
     // eslint-disable-next-line @next/next/no-img-element -- admin-provided URLs from any host
-    return <img src={imageUrl} alt={name} className={cn('object-cover', className)} />;
+    return <img src={imageUrl} alt={name} loading="lazy" className={cn("object-cover", className)} />;
   }
   const a = art[category ?? ''] ?? art.skin;
   const Icon = a.icon;

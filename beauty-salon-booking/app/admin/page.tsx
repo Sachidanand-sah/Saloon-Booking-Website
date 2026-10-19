@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { CalendarCheck, CalendarDays, Check, Clock, Phone, TrendingUp, UserPlus, UserX, Wallet, type LucideIcon } from 'lucide-react';
+import { CalendarCheck, CalendarDays, Check, Clock, MapPin, Phone, TrendingUp, UserPlus, UserX, Wallet, type LucideIcon } from 'lucide-react';
 import {
   ErrorState,
   PageHeader,
@@ -256,6 +256,12 @@ function AppointmentRow({ booking: b, timeZone }: { booking: Booking; timeZone: 
             <Avatar name={b.staff.name} src={b.staff.avatarUrl} className="size-5 text-[0.6rem]" />
             {b.staff.name}
           </span>
+          {b.location ? (
+            <span className="inline-flex items-center gap-1">
+              <MapPin className="size-3.5" aria-hidden />
+              {b.location.name}
+            </span>
+          ) : null}
           {b.customer?.phone ? (
             <a href={`tel:${b.customer.phone}`} className="inline-flex items-center gap-1 hover:text-rose-600">
               <Phone className="size-3.5" aria-hidden />

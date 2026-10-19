@@ -51,7 +51,7 @@ export default function LoginScreen({ navigation }) {
     <View style={styles.container}>
       <View style={styles.header}>
         <View style={styles.logo} />
-        <Text style={styles.title}>Lovely Glow</Text>
+        <Text style={styles.title}>Lalima Beauty</Text>
         <Text style={styles.subtitle}>Elegance meets expertise</Text>
       </View>
 

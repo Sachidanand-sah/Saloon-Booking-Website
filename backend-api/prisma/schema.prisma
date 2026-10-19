@@ -48,6 +48,28 @@ model RefreshToken {
   @@index([userId])
 }
 
+/// A salon branch. Stylists work at one branch; bookings remember where they took place.
+model Location {
+  id           String    @id @default(cuid())
+  slug         String    @unique
+  name         String
+  description  String?
+  addressLine1 String
+  addressLine2 String?
+  city         String
+  phone        String?
+  email        String?
+  latitude     Float?
+  longitude    Float?
+  imageUrl     String?
+  isActive     Boolean   @default(true)
+  sortOrder    Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  staff        Staff[]
+  bookings     Booking[]
+}
+
 model Category {
   id          String    @id @default(cuid())
   slug        String    @unique
@@ -85,8 +107,10 @@ model Staff {
   bio          String?
   avatarUrl    String?
   isActive     Boolean        @default(true)
+  locationId   String?
   createdAt    DateTime       @default(now())
   user         User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  location     Location?      @relation(fields: [locationId], references: [id], onDelete: SetNull)
   services     StaffService[]
   workingHours WorkingHours[]
   bookings     Booking[]
@@ -118,6 +142,7 @@ model Booking {
   customerId  String
   serviceId   String
   staffId     String
+  locationId  String?
   startAt     DateTime
   endAt       DateTime
   status      BookingStatus @default(CONFIRMED)
@@ -129,10 +154,12 @@ model Booking {
   customer    User          @relation(fields: [customerId], references: [id])
   service     Service       @relation(fields: [serviceId], references: [id])
   staff       Staff         @relation(fields: [staffId], references: [id])
+  location    Location?     @relation(fields: [locationId], references: [id], onDelete: SetNull)
   review      Review?
 
   @@index([staffId, startAt])
   @@index([customerId, startAt])
+  @@index([locationId, startAt])
 }
 
 model Review {

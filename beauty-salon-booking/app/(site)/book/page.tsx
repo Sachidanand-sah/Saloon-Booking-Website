@@ -3,7 +3,7 @@ import { Suspense } from 'react';
 import { BookingWizard } from '@/components/booking/wizard';
 import { Skeleton } from '@/components/ui/misc';
 import { getPublic } from '@/lib/server/api';
-import type { Category, SalonInfo, Service, Staff } from '@/lib/types';
+import type { Category, LocationListItem, SalonInfo, Service, Staff } from '@/lib/types';
 
 export const metadata: Metadata = {
   title: 'Book an appointment',
@@ -11,11 +11,12 @@ export const metadata: Metadata = {
 };
 
 export default async function BookPage() {
-  const [services, categories, staff, salon] = await Promise.all([
+  const [services, categories, staff, salon, branches] = await Promise.all([
     getPublic<Service[]>('/services', 30),
     getPublic<Category[]>('/categories', 30),
     getPublic<Staff[]>('/staff', 30),
     getPublic<SalonInfo>('/salon', 300),
+    getPublic<LocationListItem[]>('/locations', 60),
   ]);
 
   return (
@@ -23,7 +24,13 @@ export default async function BookPage() {
       <div className="container-page">
         {services && staff && salon ? (
           <Suspense fallback={<Skeleton className="h-[480px]" />}>
-            <BookingWizard services={services} categories={categories ?? []} staff={staff} salon={salon} />
+            <BookingWizard
+              services={services}
+              categories={categories ?? []}
+              staff={staff}
+              salon={salon}
+              branches={branches ?? []}
+            />
           </Suspense>
         ) : (
           <p className="card mx-auto max-w-lg p-8 text-center text-muted">

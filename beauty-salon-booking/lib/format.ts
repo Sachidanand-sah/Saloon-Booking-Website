@@ -1,4 +1,9 @@
-export function formatPrice(amount: number, currency = 'USD') {
+export function formatPrice(amount: number, currency = 'NPR') {
+  if (currency === 'NPR') {
+    // Nepali convention: "Rs. 1,500" with lakh grouping (1,50,000).
+    const n = new Intl.NumberFormat('en-IN', { maximumFractionDigits: Number.isInteger(amount) ? 0 : 2 }).format(amount);
+    return `Rs. ${n}`;
+  }
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,

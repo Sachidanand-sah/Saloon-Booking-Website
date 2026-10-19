@@ -10,27 +10,27 @@ import {
   ShieldCheck,
   Sparkles,
   Star,
-  Clock,
   type LucideIcon,
 } from 'lucide-react';
 import { ButtonLink } from '@/components/ui/button';
 import { Avatar, SectionHeading, Stars } from '@/components/ui/misc';
 import { ServiceCard } from '@/components/site/service-card';
-import { HoursList } from '@/components/site/footer';
+import { BranchCard } from '@/components/site/branch-card';
 import { getPublic } from '@/lib/server/api';
 import { formatPrice } from '@/lib/format';
 import { site } from '@/lib/site';
-import type { Category, Review, SalonInfo, Service, Staff } from '@/lib/types';
+import type { Category, LocationListItem, Review, SalonInfo, Service, Staff } from '@/lib/types';
 
 const categoryIcon: Record<string, LucideIcon> = { hair: Scissors, skin: Sparkles, nails: Hand, spa: Flower2 };
 
 export default async function HomePage() {
-  const [featured, categories, staff, reviews, salon] = await Promise.all([
+  const [featured, categories, staff, reviews, salon, branches] = await Promise.all([
     getPublic<Service[]>('/services?featured=true'),
     getPublic<Category[]>('/categories'),
     getPublic<Staff[]>('/staff'),
     getPublic<Review[]>('/reviews?limit=6'),
     getPublic<SalonInfo>('/salon', 300),
+    getPublic<LocationListItem[]>('/locations', 300),
   ]);
 
   const rated = reviews?.length ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : null;
@@ -83,9 +83,12 @@ export default async function HomePage() {
 
           {/* Decorative composition */}
           <div className="relative hidden h-[520px] lg:block" aria-hidden>
-            <div className="absolute inset-y-0 right-6 w-[78%] rounded-t-[999px] bg-gradient-to-b from-rose-300/70 via-rose-500/50 to-plum-700/40 shadow-lift" />
-            <div className="absolute inset-y-10 right-16 w-[62%] rounded-t-[999px] border border-white/25" />
-            <Flower2 className="absolute right-[30%] top-[32%] size-28 text-white/30" strokeWidth={0.75} />
+            <div className="absolute inset-y-0 right-6 w-[78%] overflow-hidden rounded-t-[999px] shadow-lift">
+              {/* eslint-disable-next-line @next/next/no-img-element -- decorative, already optimised */}
+              <img src="/images/hero.jpg" alt="" className="h-full w-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-plum-900/60 via-plum-700/10 to-rose-300/10" />
+            </div>
+            <div className="absolute inset-y-10 right-16 w-[62%] rounded-t-[999px] border border-white/30" />
             {reviews?.[0] ? (
               <div className="absolute bottom-16 left-0 w-72 rounded-2xl bg-white p-5 text-ink shadow-lift">
                 <Stars value={reviews[0].rating} />
@@ -241,41 +244,43 @@ export default async function HomePage() {
         </section>
       ) : null}
 
-      {/* ---------- Visit ---------- */}
-      <section id="visit" className="container-page scroll-mt-24 py-20 sm:py-28">
-        <div className="card grid overflow-hidden lg:grid-cols-2">
-          <div className="p-8 sm:p-12">
-            <p className="eyebrow">Visit us</p>
-            <h2 className="mt-3 text-3xl sm:text-4xl">Your calm corner of the city</h2>
-            <ul className="mt-8 space-y-4 text-sm">
-              <li className="flex gap-3">
-                <MapPin className="size-5 shrink-0 text-rose-500" />
-                <span>
-                  {site.address.line1}, {site.address.line2}, {site.address.city}
-                  <a href={site.mapUrl} target="_blank" rel="noreferrer" className="ml-2 font-semibold text-rose-600 hover:underline">
-                    Get directions
-                  </a>
-                </span>
-              </li>
-              <li className="flex gap-3">
-                <Phone className="size-5 shrink-0 text-rose-500" />
-                <a href={`tel:${site.phone.replace(/[^+\d]/g, '')}`} className="hover:text-rose-600">{site.phone}</a>
-              </li>
-            </ul>
-            <div className="mt-8 rounded-2xl bg-ivory p-5">
-              <p className="flex items-center gap-2 text-sm font-semibold text-plum-900">
-                <Clock className="size-4 text-rose-500" /> Opening hours
-              </p>
-              {salon ? <HoursList hours={salon.openingHours} className="mt-3 text-sm text-muted" /> : null}
-            </div>
+      {/* ---------- Locations ---------- */}
+      {branches?.length ? (
+        <section id="visit" className="container-page scroll-mt-24 py-20 sm:py-28">
+          <div className="flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-end">
+            <SectionHeading
+              align="left"
+              eyebrow="Visit us"
+              title={branches.length > 1 ? `${branches.length} studios across the valley` : 'Your calm corner of the city'}
+              intro="Same signature experience at every branch. Pick the one closest to you and book in seconds."
+            />
+            <ButtonLink href="/locations" variant="outline">
+              <MapPin className="size-4" /> View on map
+            </ButtonLink>
           </div>
-          <div className="hero-glow flex flex-col justify-end p-8 text-white sm:p-12">
-            <Flower2 className="size-12 text-rose-300" strokeWidth={1} />
-            <h3 className="mt-6 text-3xl !text-white">Ready for your glow-up?</h3>
-            <p className="mt-3 max-w-sm text-white/75">
-              Same-week appointments are usually available. Book online in under a minute.
-            </p>
-            <ButtonLink href="/book" variant="light" size="lg" className="mt-8 self-start">
+          <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {branches.map(b => (
+              <BranchCard key={b.id} branch={b} timeZone={salon?.timezone ?? 'UTC'} />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {/* ---------- Closing CTA ---------- */}
+      <section className="container-page pb-20 sm:pb-28">
+        <div className="hero-glow relative overflow-hidden rounded-[var(--radius-card)] px-8 py-14 text-white sm:px-14">
+          <Flower2 className="absolute -right-10 -top-10 size-64 text-white/5" strokeWidth={0.5} aria-hidden />
+          <div className="relative flex flex-col items-start justify-between gap-8 md:flex-row md:items-center">
+            <div>
+              <h2 className="text-3xl !text-white sm:text-4xl">Ready for your glow-up?</h2>
+              <p className="mt-3 max-w-md text-white/75">
+                Same-week appointments are usually available. Questions? Call us on{' '}
+                <a href={`tel:${site.phone.replace(/[^+\d]/g, '')}`} className="inline-flex items-center gap-1 font-semibold text-white hover:underline">
+                  <Phone className="size-4" /> {site.phone}
+                </a>
+              </p>
+            </div>
+            <ButtonLink href="/book" variant="light" size="lg">
               Book now <ArrowRight className="size-4" />
             </ButtonLink>
           </div>

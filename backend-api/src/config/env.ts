@@ -12,11 +12,13 @@ const schema = z.object({
   JWT_REFRESH_TTL_DAYS: z.coerce.number().int().positive().default(30),
   CORS_ORIGINS: z.string().default(''),
   SALON_TIMEZONE: z.string().refine(tz => IANAZone.isValidZone(tz), 'must be a valid IANA time zone').default('UTC'),
-  CURRENCY: z.string().length(3).default('USD'),
+  CURRENCY: z.string().length(3).default('NPR'),
   SLOT_STEP_MINS: z.coerce.number().int().min(5).max(120).default(15),
   MIN_LEAD_MINS: z.coerce.number().int().min(0).default(60),
   BOOKING_WINDOW_DAYS: z.coerce.number().int().positive().default(90),
   CANCEL_CUTOFF_MINS: z.coerce.number().int().min(0).default(120),
+  // Login/signup attempts allowed per client IP per 15 minutes.
+  AUTH_RATE_LIMIT: z.coerce.number().int().positive().default(20),
 });
 
 const parsed = schema.safeParse(process.env);
