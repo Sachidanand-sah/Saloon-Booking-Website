@@ -3,19 +3,51 @@
 import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { CalendarDays, ExternalLink, LayoutDashboard, LogOut, MapPin, Menu, Scissors, Users, X, type LucideIcon } from 'lucide-react';
+import {
+  CalendarDays,
+  Crown,
+  ExternalLink,
+  LayoutDashboard,
+  LogOut,
+  MapPin,
+  Menu,
+  PartyPopper,
+  Scissors,
+  ShoppingBag,
+  UserRound,
+  Users,
+  X,
+  type LucideIcon,
+} from 'lucide-react';
+import { useAdminInbox, type AdminInbox } from '@/components/admin/extras';
 import { useSession, useToast } from '@/components/providers';
 import { Avatar } from '@/components/ui/misc';
 import { errorMessage } from '@/lib/client';
 import { cn } from '@/lib/format';
 import { site } from '@/lib/site';
 
-const NAV: { href: string; label: string; icon: LucideIcon }[] = [
-  { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/admin/bookings', label: 'Bookings', icon: CalendarDays },
-  { href: '/admin/services', label: 'Services', icon: Scissors },
-  { href: '/admin/staff', label: 'Team', icon: Users },
-  { href: '/admin/branches', label: 'Branches', icon: MapPin },
+type NavItem = { href: string; label: string; icon: LucideIcon; badge?: keyof AdminInbox; badgeLabel?: string };
+
+const NAV: { heading: string; items: NavItem[] }[] = [
+  {
+    heading: 'Manage',
+    items: [
+      { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+      { href: '/admin/bookings', label: 'Bookings', icon: CalendarDays },
+      { href: '/admin/services', label: 'Services', icon: Scissors },
+      { href: '/admin/staff', label: 'Team', icon: Users },
+      { href: '/admin/branches', label: 'Branches', icon: MapPin },
+    ],
+  },
+  {
+    heading: 'Grow',
+    items: [
+      { href: '/admin/packages', label: 'Packages', icon: Crown, badge: 'pendingMemberships', badgeLabel: 'awaiting payment' },
+      { href: '/admin/events', label: 'Events', icon: PartyPopper, badge: 'newEventRequests', badgeLabel: 'new requests' },
+      { href: '/admin/products', label: 'Shop', icon: ShoppingBag, badge: 'pendingReservations', badgeLabel: 'to prepare' },
+      { href: '/admin/customers', label: 'Customers', icon: UserRound },
+    ],
+  },
 ];
 
 function Brand() {
@@ -31,31 +63,52 @@ function Brand() {
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const inbox = useAdminInbox();
   const isActive = (href: string) => (href === '/admin' ? pathname === '/admin' : pathname.startsWith(href));
   return (
-    <nav aria-label="Admin" className="space-y-1">
-      {NAV.map(({ href, label, icon: Icon }) => {
-        const active = isActive(href);
-        return (
-          <Link
-            key={href}
-            href={href}
-            onClick={onNavigate}
-            aria-current={active ? 'page' : undefined}
-            className={cn(
-              'group flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition',
-              active ? 'bg-plum-900 text-white shadow-soft' : 'text-plum-800 hover:bg-plum-50 hover:text-plum-900',
-            )}
-          >
-            <Icon className={cn('size-[1.15rem]', active ? 'text-rose-300' : 'text-plum-500 group-hover:text-rose-500')} aria-hidden />
-            {label}
-          </Link>
-        );
-      })}
+    <nav aria-label="Admin" className="space-y-6">
+      {NAV.map(group => (
+        <div key={group.heading}>
+          <p className="px-3.5 text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-muted">{group.heading}</p>
+          <ul className="mt-2 space-y-1">
+            {group.items.map(({ href, label, icon: Icon, badge, badgeLabel }) => {
+              const active = isActive(href);
+              const count = badge ? (inbox.data?.[badge] ?? 0) : 0;
+              return (
+                <li key={href}>
+                  <Link
+                    href={href}
+                    onClick={onNavigate}
+                    aria-current={active ? 'page' : undefined}
+                    className={cn(
+                      'group flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium transition',
+                      active ? 'bg-plum-900 text-white shadow-soft' : 'text-plum-800 hover:bg-plum-50 hover:text-plum-900',
+                    )}
+                  >
+                    <Icon className={cn('size-[1.15rem]', active ? 'text-rose-300' : 'text-plum-500 group-hover:text-rose-500')} aria-hidden />
+                    <span className="flex-1">{label}</span>
+                    {count > 0 ? (
+                      <span
+                        className={cn(
+                          'min-w-5 rounded-full px-1.5 text-center text-xs font-semibold leading-5',
+                          active ? 'bg-rose-500 text-white' : 'bg-rose-100 text-rose-600',
+                        )}
+                      >
+                        {count}
+                        <span className="sr-only"> {badgeLabel}</span>
+                      </span>
+                    ) : null}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
       <Link
         href="/"
         onClick={onNavigate}
-        className="mt-4 flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium text-muted transition hover:bg-plum-50 hover:text-plum-900"
+        className="flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-sm font-medium text-muted transition hover:bg-plum-50 hover:text-plum-900"
       >
         <ExternalLink className="size-[1.15rem]" aria-hidden />
         View website
@@ -112,8 +165,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
         <div className="px-2">
           <Brand />
         </div>
-        <p className="mt-8 px-3.5 text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-muted">Manage</p>
-        <div className="mt-2 flex-1">
+        <div className="no-scrollbar mt-8 min-h-0 flex-1 overflow-y-auto pb-4">
           <NavLinks />
         </div>
         <UserCard />

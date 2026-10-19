@@ -24,8 +24,11 @@ Demo logins come from the API seed: `admin@lalima.test / Admin@12345` (admin) an
 | Locations | `/locations` (branch list + live map), `/locations/[slug]` (map, hours, team, treatments, directions) |
 | Marketing | `/` home (hero, categories, featured services, team, reviews, hours) · `/services` (filter + search) · `/services/[slug]` |
 | Booking | `/book`: step-by-step wizard (branch → treatment → specialist → date & time → confirm). State lives in the URL, so refresh, back button and "log in to continue" all keep the selection. `/book/success` adds the visit to Google/Apple/Outlook calendars |
-| Account | `/login`, `/signup`, `/account` (upcoming/past, reschedule, cancel, review, profile) |
-| Admin | `/admin` dashboard · `/admin/bookings` · `/admin/services` · `/admin/staff` (profiles, branch, services, working hours) · `/admin/branches` |
+| Packages & rewards | `/packages` (monthly memberships: request online, pay at a branch), `/rewards` (loyalty tiers and rules) |
+| Events | `/events`, `/events/request` (bridal, party, Teej/festival, photoshoot: request a quote, accept it in your account) |
+| Shop | `/products`, `/products/[slug]` (recommended by our professionals), `/bag` (reserve for pickup at a branch) |
+| Account | `/login`, `/signup`, `/account` (upcoming/past bookings, events, orders, loyalty card, package usage, profile) |
+| Admin | `/admin` dashboard · `/admin/bookings` · `/admin/services` · `/admin/staff` (profiles, branch, services, working hours) · `/admin/branches` · `/admin/packages` · `/admin/events` · `/admin/products` · `/admin/customers` (loyalty) |
 
 ## How it talks to the API
 

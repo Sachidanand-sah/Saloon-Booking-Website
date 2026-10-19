@@ -10,8 +10,10 @@ import {
   Check,
   ChevronRight,
   Clock,
+  Coins,
   MapPin,
   Moon,
+  Sparkles,
   Sun,
   Sunrise,
   Users,
@@ -35,7 +37,16 @@ import {
 } from '@/lib/format';
 import { formatAddress, todayHours } from '@/lib/maps';
 import { BranchPhoto } from '@/components/site/branch-card';
-import type { Availability, Booking, Category, LocationListItem, SalonInfo, Service, Staff } from '@/lib/types';
+import type {
+  Availability,
+  Booking,
+  BookingQuote,
+  Category,
+  LocationListItem,
+  SalonInfo,
+  Service,
+  Staff,
+} from '@/lib/types';
 
 type Props = {
   services: Service[];
@@ -182,6 +193,9 @@ export function BookingWizard({ services, categories, staff, salon, branches }: 
               }}
               onDone={(booking, rescheduled) => {
                 qc.invalidateQueries({ queryKey: ['bookings'] });
+                qc.invalidateQueries({ queryKey: ['loyalty'] });
+                qc.invalidateQueries({ queryKey: ['memberships'] });
+                qc.invalidateQueries({ queryKey: ['quote'] });
                 if (rescheduled) {
                   toast('Your appointment has been rescheduled.');
                   router.push('/account');
@@ -582,8 +596,21 @@ function ConfirmStep({
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [usePoints, setUsePoints] = useState(false);
+  /** Points chosen on the slider; null means "as many as allowed". */
+  const [pointsChoice, setPointsChoice] = useState<number | null>(null);
   const next = encodeURIComponent(currentUrl);
   const cutoffHours = Math.round(salon.cancelCutoffMins / 60);
+
+  const quote = useQuery({
+    queryKey: ['quote', service.id, slot],
+    queryFn: () => api.get<BookingQuote>(`/bookings/quote?serviceId=${service.id}&startAt=${encodeURIComponent(slot)}`),
+    enabled: signedIn && !rescheduleId,
+  });
+  const maxPoints = quote.data?.points.maxRedeemable ?? 0;
+  const redeem = usePoints ? Math.min(pointsChoice ?? maxPoints, maxPoints) : 0;
+  const pointValue = quote.data?.points.pointValue ?? 1;
+  const total = quote.data ? Math.max(0, quote.data.afterMembership - redeem * pointValue) : service.price;
 
   const submit = async () => {
     setSubmitting(true);
@@ -597,6 +624,7 @@ function ConfirmStep({
             locationId: branch?.id,
             startAt: slot,
             notes: notes.trim() || undefined,
+            redeemPoints: redeem > 0 ? redeem : undefined,
           });
       onDone(res.booking, !!rescheduleId);
     } catch (e) {
@@ -642,9 +670,41 @@ function ConfirmStep({
               onChange={e => setNotes(e.target.value)}
             />
           ) : null}
+          {!rescheduleId ? (
+            quote.isPending ? (
+              <Skeleton className="mt-6 h-36" />
+            ) : quote.isError ? (
+              <p className="mt-6 rounded-xl bg-ivory px-4 py-3 text-sm text-muted">
+                We couldn&apos;t check your member price and points.{' '}
+                <button onClick={() => quote.refetch()} className="font-semibold text-rose-600 hover:underline">
+                  Try again
+                </button>
+              </p>
+            ) : (
+              <PriceBreakdown
+                quote={quote.data}
+                usePoints={usePoints}
+                redeem={redeem}
+                total={total}
+                onToggle={on => {
+                  setUsePoints(on);
+                  setPointsChoice(null);
+                }}
+                onPoints={setPointsChoice}
+              />
+            )
+          ) : null}
           {error ? <p className="mt-4 rounded-xl bg-danger/10 px-4 py-3 text-sm text-danger">{error}</p> : null}
-          <Button size="lg" className="mt-6 w-full" onClick={submit} loading={submitting}>
-            {rescheduleId ? 'Confirm new time' : `Confirm booking · ${formatPrice(service.price, service.currency)}`}
+          <Button
+            size="lg"
+            className="mt-6 w-full"
+            onClick={submit}
+            loading={submitting}
+            disabled={!rescheduleId && quote.isPending}
+          >
+            {rescheduleId
+              ? 'Confirm new time'
+              : `Confirm booking · ${formatPrice(total, quote.data?.currency ?? service.currency)}`}
           </Button>
           <p className="mt-3 text-center text-xs text-muted">
             Pay at the salon. Free cancellation up to {cutoffHours} hours before your appointment.
@@ -663,6 +723,121 @@ function ConfirmStep({
         </div>
       )}
     </StepCard>
+  );
+}
+
+function PriceBreakdown({
+  quote,
+  usePoints,
+  redeem,
+  total,
+  onToggle,
+  onPoints,
+}: {
+  quote: BookingQuote;
+  usePoints: boolean;
+  redeem: number;
+  total: number;
+  onToggle: (on: boolean) => void;
+  onPoints: (n: number) => void;
+}) {
+  const c = quote.currency;
+  const max = quote.points.maxRedeemable;
+  const m = quote.membership;
+  const percent = m && quote.price ? Math.round((m.discount / quote.price) * 100) : 0;
+  return (
+    <div className="mt-6 rounded-2xl border border-line p-5">
+      <dl className="space-y-3 text-sm">
+        <div className="flex justify-between gap-4">
+          <dt className="text-muted">Treatment price</dt>
+          <dd className={cn('font-medium tabular-nums', m?.kind === 'included' ? 'text-muted line-through' : 'text-plum-900')}>
+            {formatPrice(quote.price, c)}
+          </dd>
+        </div>
+        {m ? (
+          <div className="flex justify-between gap-4">
+            <dt className="flex items-start gap-1.5 text-success">
+              <Sparkles className="mt-0.5 size-4 shrink-0" />
+              {m.kind === 'included' ? `Included in your ${m.planName} package` : `${m.planName} member ${percent}% off`}
+            </dt>
+            <dd className="shrink-0 font-medium tabular-nums text-success">
+              {m.kind === 'included' ? formatPrice(0, c) : `−${formatPrice(m.discount, c)}`}
+            </dd>
+          </div>
+        ) : null}
+      </dl>
+
+      {max > 0 ? (
+        <div className="mt-4 rounded-xl bg-rose-50/60 p-4">
+          <label className="flex cursor-pointer items-center justify-between gap-3">
+            <span className="flex items-center gap-2 text-sm">
+              <Coins className="size-4 shrink-0 text-rose-500" />
+              <span>
+                <span className="font-medium text-plum-900">Use my points</span>
+                <span className="block text-xs text-muted">
+                  {quote.points.balance.toLocaleString('en-IN')} available · up to {max.toLocaleString('en-IN')} on this booking
+                </span>
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              role="switch"
+              checked={usePoints}
+              onChange={e => onToggle(e.target.checked)}
+              className="peer sr-only"
+            />
+            <span
+              aria-hidden
+              className={cn(
+                'relative h-6 w-11 shrink-0 rounded-full transition peer-focus-visible:ring-2 peer-focus-visible:ring-rose-500',
+                usePoints ? 'bg-rose-500' : 'bg-linen',
+              )}
+            >
+              <span
+                className={cn(
+                  'absolute top-0.5 size-5 rounded-full bg-white shadow transition-all',
+                  usePoints ? 'left-[1.375rem]' : 'left-0.5',
+                )}
+              />
+            </span>
+          </label>
+          {usePoints ? (
+            <div className="mt-4">
+              {max > 1 ? (
+                <input
+                  type="range"
+                  min={1}
+                  max={max}
+                  step={1}
+                  value={redeem}
+                  onChange={e => onPoints(Number(e.target.value))}
+                  aria-label="Points to use"
+                  className="w-full accent-rose-500"
+                />
+              ) : null}
+              <div className="mt-1 flex justify-between text-sm">
+                <span className="text-muted">{redeem.toLocaleString('en-IN')} points</span>
+                <span className="font-medium tabular-nums text-success">
+                  −{formatPrice(redeem * quote.points.pointValue, c)}
+                </span>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : total > 0 ? (
+        <p className="mt-4 flex items-center gap-1.5 text-xs text-muted">
+          <Coins className="size-3.5 text-rose-500" /> You&apos;ll earn points on this visit.{' '}
+          <Link href="/rewards" className="text-rose-600 hover:underline">
+            How rewards work
+          </Link>
+        </p>
+      ) : null}
+
+      <div className="mt-4 flex items-end justify-between gap-4 border-t border-line pt-4">
+        <span className="text-sm text-muted">To pay at the salon</span>
+        <span className="font-display text-2xl font-semibold text-plum-900">{formatPrice(total, c)}</span>
+      </div>
+    </div>
   );
 }
 
@@ -702,7 +877,7 @@ function Summary({
             <Row label="Duration" value={service ? formatDuration(service.durationMins) : undefined} />
           </dl>
           <div className="mt-6 flex items-end justify-between border-t border-line pt-5">
-            <span className="text-sm text-muted">Total</span>
+            <span className="text-sm text-muted">Price</span>
             <span className="font-display text-3xl font-semibold text-plum-900">
               {service ? formatPrice(service.price, service.currency) : '—'}
             </span>

@@ -189,8 +189,8 @@ function BookingsView({ timeZone }: { timeZone: string }) {
                         </p>
                       ) : null}
                     </td>
-                    <td className="whitespace-nowrap px-5 py-4 text-right font-medium text-plum-900">
-                      {formatPrice(b.price, b.currency)}
+                    <td className="whitespace-nowrap px-5 py-4 text-right">
+                      <PriceInfo booking={b} />
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex flex-col items-start gap-2">
@@ -228,7 +228,9 @@ function BookingsView({ timeZone }: { timeZone: string }) {
                       {b.location ? ` · ${b.location.name}` : ''}
                     </p>
                   </div>
-                  <p className="shrink-0 font-semibold text-plum-900">{formatPrice(b.price, b.currency)}</p>
+                  <div className="shrink-0 text-right">
+                    <PriceInfo booking={b} />
+                  </div>
                 </div>
                 <div className="mt-3">
                   <StatusSelect booking={b} />
@@ -255,6 +257,27 @@ function BookingsView({ timeZone }: { timeZone: string }) {
         </div>
       )}
     </>
+  );
+}
+
+/** Amount to pay; when a membership or points discount applies, shows the list price struck through. */
+function PriceInfo({ booking: b }: { booking: Booking }) {
+  if (!(b.discount > 0)) return <p className="font-medium text-plum-900">{formatPrice(b.price, b.currency)}</p>;
+  const parts = [b.membershipApplied ? 'Member' : null, b.pointsRedeemed > 0 ? `${b.pointsRedeemed} pts` : null].filter(Boolean);
+  return (
+    <div className="space-y-0.5">
+      <p className="font-medium text-plum-900">
+        <span className="sr-only">Total </span>
+        {formatPrice(b.total, b.currency)}
+      </p>
+      <p className="text-xs text-muted">
+        <span className="sr-only">List price </span>
+        <s>{formatPrice(b.price, b.currency)}</s>
+      </p>
+      <p className="text-xs font-medium text-rose-600" title={parts.join(' · ') || undefined}>
+        {parts.length ? `${parts.join(' · ')} ` : ''}−{formatPrice(b.discount, b.currency)}
+      </p>
+    </div>
   );
 }
 

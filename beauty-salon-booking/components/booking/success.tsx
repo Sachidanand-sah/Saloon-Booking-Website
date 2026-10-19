@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { CalendarPlus, Check, Download, MapPin } from 'lucide-react';
+import { CalendarPlus, Check, Download, MapPin, Sparkles } from 'lucide-react';
 import { ButtonLink, buttonClass } from '@/components/ui/button';
 import { Avatar, Skeleton } from '@/components/ui/misc';
 import { api } from '@/lib/client';
@@ -114,9 +114,28 @@ export function BookingSuccess({ id }: { id?: string }) {
               )}
             </dd>
           </div>
+          {b.discount > 0 ? (
+            <>
+              <div className="flex justify-between gap-4 py-4">
+                <dt className="text-muted">Price</dt>
+                <dd className="tabular-nums text-muted line-through">{formatPrice(b.price, b.currency)}</dd>
+              </div>
+              <div className="flex justify-between gap-4 py-4">
+                <dt className="flex items-center gap-1.5 text-success">
+                  <Sparkles className="size-4" />
+                  {b.membershipApplied && b.pointsRedeemed
+                    ? `Package + ${b.pointsRedeemed} points`
+                    : b.membershipApplied
+                      ? 'Package benefit'
+                      : `${b.pointsRedeemed} points used`}
+                </dt>
+                <dd className="font-medium tabular-nums text-success">−{formatPrice(b.discount, b.currency)}</dd>
+              </div>
+            </>
+          ) : null}
           <div className="flex justify-between gap-4 py-4">
             <dt className="text-muted">Pay at salon</dt>
-            <dd className="font-display text-xl font-semibold text-plum-900">{formatPrice(b.price, b.currency)}</dd>
+            <dd className="font-display text-xl font-semibold text-plum-900">{formatPrice(b.total, b.currency)}</dd>
           </div>
         </dl>
         <div className="grid gap-3 border-t border-line bg-ivory/60 p-6 sm:grid-cols-2">

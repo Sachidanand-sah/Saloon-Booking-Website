@@ -98,6 +98,19 @@ Errors always look like `{ "code": "SLOT_UNAVAILABLE", "message": "…", "detail
 `GET|POST /admin/locations`, `PATCH|DELETE /admin/locations/:id` ·
 `GET|POST /admin/staff`, `PATCH /admin/staff/:id`, `PUT /admin/staff/:id/hours`, `PUT /admin/staff/:id/services` · `GET /admin/customers`
 
+## Packages, loyalty, events and products
+
+| Area | Public / customer endpoints | Admin endpoints |
+| :--- | :--- | :--- |
+| Monthly packages | `GET /plans`, `GET|POST /memberships`, `POST /memberships/:id/cancel` | `/admin/plans` CRUD, `GET /admin/memberships`, `POST /admin/memberships/:id/activate|renew|cancel` |
+| Loyalty | `GET /loyalty/programme`, `GET /loyalty/me` | `GET|POST /admin/customers/:id/loyalty` |
+| Bookings | `GET /bookings/quote` (member discount + redeemable points); `POST /bookings` accepts `redeemPoints` | Marking a booking `COMPLETED` awards points; cancelling refunds points spent |
+| Events | `GET /event-packages`, `GET|POST /event-requests`, `POST /event-requests/:id/accept|decline|cancel` | `/admin/event-packages` CRUD, `GET /admin/event-requests`, `POST /admin/event-requests/:id/quote` |
+| Products | `GET /products` (`?category&serviceId&staffId&featured`), `GET /products/:slug`, `GET|POST /reservations` | `/admin/products` CRUD, `GET|PATCH /admin/reservations` |
+| Dashboard | | `GET /admin/inbox` (to-do counts) |
+
+Loyalty settings live in `.env`: `LOYALTY_POINTS_PER_100` (default 5), `LOYALTY_POINT_VALUE_CENTS` (100 = Rs. 1), `LOYALTY_MAX_REDEEM_PERCENT` (50), `LOYALTY_SIGNUP_BONUS` (100). Tiers: Silver, Gold at 1,000 lifetime points (1.25× earning), Platinum at 3,000 (1.5×).
+
 ## How double-booking is prevented
 
 1. `/availability` only offers start times that fit inside a stylist's working hours and don't overlap their existing bookings.

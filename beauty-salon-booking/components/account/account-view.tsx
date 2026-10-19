@@ -2,26 +2,53 @@
 
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarDays, CalendarX2, Clock, History, MapPin, Star, UserRound } from 'lucide-react';
+import {
+  CalendarDays,
+  CalendarX2,
+  Clock,
+  History,
+  MapPin,
+  PartyPopper,
+  ShoppingBag,
+  Sparkles,
+  Star,
+  UserRound,
+  type LucideIcon,
+} from 'lucide-react';
 import { useSession, useToast } from '@/components/providers';
 import { Button, ButtonLink } from '@/components/ui/button';
 import { Input, Textarea } from '@/components/ui/field';
-import { Avatar, EmptyState, Modal, Skeleton, StatusBadge } from '@/components/ui/misc';
+import { Avatar, Badge, EmptyState, Modal, Skeleton, StatusBadge } from '@/components/ui/misc';
 import { PageHeader } from '@/components/site/page-header';
 import { api, errorMessage } from '@/lib/client';
 import { directionsUrl, formatAddress } from '@/lib/maps';
 import { cn, formatDate, formatDuration, formatPrice, formatTime } from '@/lib/format';
 import type { Booking, SalonInfo, User } from '@/lib/types';
+import { EventRequests } from './event-requests';
+import { LoyaltyCard } from './loyalty-card';
+import { MyPackage } from './my-package';
+import { Orders } from './orders';
 
 type Scope = 'upcoming' | 'past';
+export type AccountTab = Scope | 'events' | 'orders';
 
-export function AccountView() {
+const tabs: { key: AccountTab; label: string; icon: LucideIcon }[] = [
+  { key: 'upcoming', label: 'Upcoming', icon: CalendarDays },
+  { key: 'past', label: 'Past', icon: History },
+  { key: 'events', label: 'Events', icon: PartyPopper },
+  { key: 'orders', label: 'Orders', icon: ShoppingBag },
+];
+
+export function AccountView({ initialTab = 'upcoming' }: { initialTab?: AccountTab }) {
   const { user } = useSession();
-  const [scope, setScope] = useState<Scope>('upcoming');
+  const [tab, setTab] = useState<AccountTab>(initialTab);
+  const scope: Scope = tab === 'past' ? 'past' : 'upcoming';
+  const isBookings = tab === 'upcoming' || tab === 'past';
   const salon = useQuery({ queryKey: ['salon'], queryFn: () => api.get<SalonInfo>('/salon') });
   const bookings = useQuery({
     queryKey: ['bookings', scope],
     queryFn: () => api.get<Booking[]>(`/bookings?scope=${scope}`),
+    enabled: isBookings,
   });
   const [cancelling, setCancelling] = useState<Booking | null>(null);
   const [reviewing, setReviewing] = useState<Booking | null>(null);
@@ -32,7 +59,7 @@ export function AccountView() {
       <PageHeader
         eyebrow="My account"
         title={user ? `Hello, ${user.name.split(' ')[0]}` : 'My account'}
-        intro="Manage your appointments, reschedule in a tap, and share how your visit went."
+        intro="Manage your appointments, packages, event quotes and product orders, all in one place."
       >
         <ButtonLink href="/book" className="mt-8">
           <CalendarDays className="size-4" /> Book a new appointment
@@ -40,27 +67,36 @@ export function AccountView() {
       </PageHeader>
 
       <div className="container-page grid gap-8 py-12 lg:grid-cols-[1fr_340px]">
-        <section>
-          <div className="inline-flex rounded-full border border-line bg-white p-1" role="tablist">
-            {(['upcoming', 'past'] as const).map(s => (
-              <button
-                key={s}
-                role="tab"
-                aria-selected={scope === s}
-                onClick={() => setScope(s)}
-                className={cn(
-                  'flex items-center gap-2 rounded-full px-5 py-2 text-sm font-medium capitalize transition',
-                  scope === s ? 'bg-plum-900 text-white' : 'text-plum-800 hover:bg-plum-50',
-                )}
-              >
-                {s === 'upcoming' ? <CalendarDays className="size-4" /> : <History className="size-4" />}
-                {s}
-              </button>
-            ))}
+        <section className="min-w-0">
+          <div className="no-scrollbar -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+            <div className="inline-flex rounded-full border border-line bg-white p-1" role="tablist" aria-label="Account sections">
+              {tabs.map(t => (
+                <button
+                  key={t.key}
+                  role="tab"
+                  aria-selected={tab === t.key}
+                  onClick={() => {
+                    setTab(t.key);
+                    window.history.replaceState(null, '', t.key === 'upcoming' ? '/account' : `/account?tab=${t.key}`);
+                  }}
+                  className={cn(
+                    'flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition sm:px-5',
+                    tab === t.key ? 'bg-plum-900 text-white' : 'text-plum-800 hover:bg-plum-50',
+                  )}
+                >
+                  <t.icon className="size-4" />
+                  {t.label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div className="mt-6 space-y-4">
-            {bookings.isPending ? (
+          <div className="mt-6 space-y-4" role="tabpanel">
+            {tab === 'events' ? (
+              <EventRequests />
+            ) : tab === 'orders' ? (
+              <Orders />
+            ) : bookings.isPending ? (
               [0, 1].map(i => <Skeleton key={i} className="h-40" />)
             ) : bookings.isError ? (
               <div className="card p-6 text-sm text-muted">
@@ -89,7 +125,15 @@ export function AccountView() {
         </section>
 
         <aside className="space-y-4 lg:sticky lg:top-28 lg:self-start">
-          {user ? <ProfileCard user={user} /> : <Skeleton className="h-64" />}
+          {user ? (
+            <>
+              <LoyaltyCard />
+              <MyPackage />
+              <ProfileCard user={user} />
+            </>
+          ) : (
+            <Skeleton className="h-64" />
+          )}
           {salon.data ? (
             <p className="px-2 text-xs leading-relaxed text-muted">
               You can cancel or reschedule online up to {Math.round(salon.data.cancelCutoffMins / 60)} hours before your
@@ -128,8 +172,26 @@ function BookingCard({ booking: b, tz, onCancel, onReview }: { booking: Booking;
           <span className="inline-flex items-center gap-1.5">
             <Avatar name={b.staff.name} src={b.staff.avatarUrl} className="size-5 text-[8px]" /> {b.staff.name}
           </span>
-          <span className="font-medium text-plum-900">{formatPrice(b.price, b.currency)}</span>
+          <span className="font-medium text-plum-900">
+            {b.discount > 0 ? (
+              <span className="mr-1.5 font-normal text-muted line-through">{formatPrice(b.price, b.currency)}</span>
+            ) : null}
+            {formatPrice(b.total, b.currency)}
+          </span>
         </p>
+        {b.discount > 0 ? (
+          <p className="mt-2 flex flex-wrap items-center gap-2">
+            {b.membershipApplied ? (
+              <Badge tone="rose">
+                <Sparkles className="size-3" /> Member price
+              </Badge>
+            ) : null}
+            <span className="text-sm font-medium text-success">
+              You saved {formatPrice(b.discount, b.currency)}
+              {b.pointsRedeemed ? ` (incl. ${b.pointsRedeemed} points)` : ''}
+            </span>
+          </p>
+        ) : null}
         {b.location ? (
           <p className="mt-1.5 flex items-start gap-1.5 text-sm text-muted">
             <MapPin className="mt-0.5 size-4 shrink-0 text-rose-500" />
@@ -181,6 +243,8 @@ function CancelModal({ booking, tz, onClose }: { booking: Booking | null; tz?: s
     mutationFn: (id: string) => api.post(`/bookings/${id}/cancel`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['bookings'] });
+      qc.invalidateQueries({ queryKey: ['loyalty'] });
+      qc.invalidateQueries({ queryKey: ['memberships'] });
       toast('Your appointment has been cancelled.');
       onClose();
     },

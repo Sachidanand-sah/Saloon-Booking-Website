@@ -3,16 +3,18 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { CalendarDays, ChevronDown, LayoutDashboard, LogOut, Menu, User, X } from 'lucide-react';
+import { CalendarDays, ChevronDown, Gift, LayoutDashboard, LogOut, Menu, User, X } from 'lucide-react';
 import { useSession } from '@/components/providers';
 import { ButtonLink } from '@/components/ui/button';
+import { BagButton } from '@/components/shop/bag-button';
 import { cn } from '@/lib/format';
 import { site } from '@/lib/site';
 
 const links = [
   { href: '/services', label: 'Services' },
-  { href: '/#team', label: 'Our team' },
-  { href: '/#reviews', label: 'Reviews' },
+  { href: '/packages', label: 'Packages' },
+  { href: '/events', label: 'Events' },
+  { href: '/products', label: 'Shop' },
   { href: '/locations', label: 'Locations' },
 ];
 
@@ -59,6 +61,9 @@ function UserMenu() {
           <p className="truncate px-3 py-2 text-xs text-muted">{user.email}</p>
           <MenuLink href="/account" icon={CalendarDays} onClick={() => setOpen(false)}>
             My bookings
+          </MenuLink>
+          <MenuLink href="/rewards" icon={Gift} onClick={() => setOpen(false)}>
+            Rewards
           </MenuLink>
           {user.role === 'ADMIN' ? (
             <MenuLink href="/admin" icon={LayoutDashboard} onClick={() => setOpen(false)}>
@@ -133,15 +138,15 @@ export function SiteHeader() {
       <div className="container-page flex h-18 items-center justify-between gap-4">
         <Logo light={overHero} />
 
-        <nav className="hidden items-center gap-1 md:flex" aria-label="Main">
+        <nav className="hidden items-center gap-0.5 lg:flex" aria-label="Main">
           {links.map(l => (
             <Link
               key={l.href}
               href={l.href}
               className={cn(
-                'rounded-full px-4 py-2 text-sm font-medium transition-colors',
+                'rounded-full px-3.5 py-2 text-sm font-medium transition-colors xl:px-4',
                 overHero ? 'text-white/85 hover:text-white' : 'text-plum-800 hover:bg-plum-50',
-                pathname === l.href && !overHero && 'bg-plum-50',
+                (pathname === l.href || pathname.startsWith(`${l.href}/`)) && !overHero && 'bg-plum-50',
               )}
             >
               {l.label}
@@ -149,7 +154,8 @@ export function SiteHeader() {
           ))}
         </nav>
 
-        <div className="hidden items-center gap-2 md:flex">
+        <div className="hidden items-center gap-2 lg:flex">
+          <BagButton light={overHero} />
           {loading ? null : user ? (
             <div className={cn(overHero && '[&>div>button]:text-white [&>div>button:hover]:bg-white/10')}>
               <UserMenu />
@@ -170,29 +176,35 @@ export function SiteHeader() {
           </ButtonLink>
         </div>
 
-        <button
-          className={cn('rounded-full p-2 md:hidden', overHero ? 'text-white' : 'text-plum-900')}
-          onClick={() => setMobileOpen(!mobileOpen)}
-          aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
-          aria-expanded={mobileOpen}
-        >
-          {mobileOpen ? <X className="size-6" /> : <Menu className="size-6" />}
-        </button>
+        <div className="flex items-center gap-1 lg:hidden">
+          <BagButton light={overHero} />
+          <button
+            className={cn('rounded-full p-2', overHero ? 'text-white' : 'text-plum-900')}
+            onClick={() => setMobileOpen(!mobileOpen)}
+            aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={mobileOpen}
+          >
+            {mobileOpen ? <X className="size-6" /> : <Menu className="size-6" />}
+          </button>
+        </div>
       </div>
 
       {mobileOpen ? (
-        <div className="border-t border-line bg-ivory md:hidden">
+        <div className="max-h-[calc(100dvh-4.5rem)] overflow-y-auto border-t border-line bg-ivory lg:hidden">
           <nav className="container-page flex flex-col gap-1 py-4" aria-label="Mobile">
             {links.map(l => (
               <Link key={l.href} href={l.href} className="rounded-xl px-3 py-3 text-base font-medium text-plum-900 hover:bg-plum-50">
                 {l.label}
               </Link>
             ))}
+            <Link href="/rewards" className="rounded-xl px-3 py-3 text-base font-medium text-plum-900 hover:bg-plum-50">
+              Rewards
+            </Link>
             <div className="my-2 h-px bg-line" />
             {user ? (
               <>
                 <Link href="/account" className="rounded-xl px-3 py-3 text-base font-medium text-plum-900 hover:bg-plum-50">
-                  My bookings
+                  My account
                 </Link>
                 {user.role === 'ADMIN' ? (
                   <Link href="/admin" className="rounded-xl px-3 py-3 text-base font-medium text-plum-900 hover:bg-plum-50">

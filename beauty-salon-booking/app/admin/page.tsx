@@ -1,7 +1,24 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { CalendarCheck, CalendarDays, Check, Clock, MapPin, Phone, TrendingUp, UserPlus, UserX, Wallet, type LucideIcon } from 'lucide-react';
+import Link from 'next/link';
+import {
+  ArrowRight,
+  CalendarCheck,
+  CalendarDays,
+  Check,
+  Clock,
+  Crown,
+  MapPin,
+  PartyPopper,
+  Phone,
+  ShoppingBag,
+  TrendingUp,
+  UserPlus,
+  UserX,
+  Wallet,
+  type LucideIcon,
+} from 'lucide-react';
 import {
   ErrorState,
   PageHeader,
@@ -11,11 +28,12 @@ import {
   type AdminStats,
   type BookingsPage,
 } from '@/components/admin/common';
+import { useAdminInbox } from '@/components/admin/extras';
 import { useSession } from '@/components/providers';
 import { Button, ButtonLink } from '@/components/ui/button';
-import { Avatar, EmptyState, Skeleton, StatusBadge } from '@/components/ui/misc';
+import { Avatar, Badge, EmptyState, Skeleton, StatusBadge } from '@/components/ui/misc';
 import { api } from '@/lib/client';
-import { formatDate, formatPrice, formatTime, hourIn, todayIn } from '@/lib/format';
+import { cn, formatDate, formatPrice, formatTime, hourIn, todayIn } from '@/lib/format';
 import type { Booking } from '@/lib/types';
 
 /** Time-aware greeting; waits for the salon time zone so server and client render the same text. */
@@ -45,6 +63,7 @@ export default function AdminDashboardPage() {
         }
       />
       <Stats />
+      <Inbox />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
         <TopServices />
         {salon.isError ? (
@@ -123,6 +142,108 @@ function Stats() {
         sub={`+${data.customers.newThisMonth} this month`}
       />
     </div>
+  );
+}
+
+// ---------- Inbox (to-dos from packages, events and the shop) ----------
+
+function InboxCard({
+  href,
+  icon: Icon,
+  count,
+  label,
+  idle,
+  urgent,
+}: {
+  href: string;
+  icon: LucideIcon;
+  count: number;
+  label: string;
+  idle: string;
+  urgent?: boolean;
+}) {
+  const hot = urgent && count > 0;
+  return (
+    <Link
+      href={href}
+      className={cn(
+        'card group flex items-center gap-4 p-4 transition hover:-translate-y-0.5 hover:shadow-lift',
+        hot && 'border-rose-300 bg-rose-50/60',
+      )}
+    >
+      <span
+        className={cn(
+          'flex size-10 shrink-0 items-center justify-center rounded-xl',
+          hot ? 'bg-rose-500 text-white' : 'bg-plum-50 text-plum-500',
+        )}
+      >
+        <Icon className="size-5" aria-hidden />
+      </span>
+      <span className="min-w-0 flex-1">
+        {count > 0 ? (
+          <>
+            <span className="block font-display text-2xl font-semibold leading-none text-plum-900">{count}</span>
+            <span className="mt-1 block text-sm text-muted">{label}</span>
+          </>
+        ) : (
+          <span className="block text-sm text-muted">{idle}</span>
+        )}
+      </span>
+      <ArrowRight className="size-4 shrink-0 text-muted transition group-hover:translate-x-0.5 group-hover:text-rose-500" aria-hidden />
+    </Link>
+  );
+}
+
+function Inbox() {
+  const { data, isPending, isError } = useAdminInbox();
+  if (isError) return null; // Not essential; the rest of the dashboard still works.
+  return (
+    <section aria-labelledby="inbox-heading">
+      <h2 id="inbox-heading" className="sr-only">
+        Inbox
+      </h2>
+      {isPending ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {[0, 1, 2, 3].map(i => (
+            <Skeleton key={i} className="h-[4.5rem]" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <InboxCard
+            href="/admin/packages"
+            icon={Wallet}
+            urgent
+            count={data.pendingMemberships}
+            label={`package${data.pendingMemberships === 1 ? '' : 's'} awaiting payment`}
+            idle="No packages awaiting payment"
+          />
+          <InboxCard
+            href="/admin/events"
+            icon={PartyPopper}
+            urgent
+            count={data.newEventRequests}
+            label={`new event request${data.newEventRequests === 1 ? '' : 's'} to quote`}
+            idle={data.upcomingEvents ? `${data.upcomingEvents} confirmed event${data.upcomingEvents === 1 ? '' : 's'} coming up` : 'No new event requests'}
+          />
+          <InboxCard
+            href="/admin/products"
+            icon={ShoppingBag}
+            urgent
+            count={data.pendingReservations}
+            label={`reservation${data.pendingReservations === 1 ? '' : 's'} to prepare`}
+            idle="No reservations to prepare"
+          />
+          <InboxCard
+            href="/admin/packages"
+            icon={Crown}
+            count={data.activeMembers}
+            label={`active member${data.activeMembers === 1 ? '' : 's'}`}
+            idle="No active members yet"
+          />
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -247,6 +368,11 @@ function AppointmentRow({ booking: b, timeZone }: { booking: Booking; timeZone: 
         <div className="flex flex-wrap items-center gap-2">
           <p className="truncate font-medium text-plum-900">{b.customer?.name ?? 'Guest'}</p>
           <StatusBadge status={b.status} />
+          {b.discount > 0 ? (
+            <Badge tone="rose" className="px-2 py-0.5">
+              {b.membershipApplied ? 'Member · ' : ''}−{formatPrice(b.discount, b.currency)}
+            </Badge>
+          ) : null}
         </div>
         <p className="mt-0.5 truncate text-sm text-muted">
           {b.service.name} · until {formatTime(b.endAt, timeZone)}

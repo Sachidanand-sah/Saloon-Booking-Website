@@ -4,7 +4,10 @@ import {
   CalendarCheck,
   Flower2,
   Hand,
+  Check,
   MapPin,
+  PartyPopper,
+  Percent,
   Phone,
   Scissors,
   ShieldCheck,
@@ -16,22 +19,29 @@ import { ButtonLink } from '@/components/ui/button';
 import { Avatar, SectionHeading, Stars } from '@/components/ui/misc';
 import { ServiceCard } from '@/components/site/service-card';
 import { BranchCard } from '@/components/site/branch-card';
+import { ProductCard } from '@/components/shop/product-card';
+import { Photo } from '@/components/ui/photo';
 import { getPublic } from '@/lib/server/api';
 import { formatPrice } from '@/lib/format';
 import { site } from '@/lib/site';
-import type { Category, LocationListItem, Review, SalonInfo, Service, Staff } from '@/lib/types';
+import type { Category, EventPackage, LocationListItem, Plan, Product, Review, SalonInfo, Service, Staff } from '@/lib/types';
 
 const categoryIcon: Record<string, LucideIcon> = { hair: Scissors, skin: Sparkles, nails: Hand, spa: Flower2 };
 
 export default async function HomePage() {
-  const [featured, categories, staff, reviews, salon, branches] = await Promise.all([
+  const [featured, categories, staff, reviews, salon, branches, plans, eventPackages, products] = await Promise.all([
     getPublic<Service[]>('/services?featured=true'),
     getPublic<Category[]>('/categories'),
     getPublic<Staff[]>('/staff'),
     getPublic<Review[]>('/reviews?limit=6'),
     getPublic<SalonInfo>('/salon', 300),
     getPublic<LocationListItem[]>('/locations', 300),
+    getPublic<Plan[]>('/plans', 300),
+    getPublic<EventPackage[]>('/event-packages', 300),
+    getPublic<Product[]>('/products?featured=true'),
   ]);
+  const plan = plans?.find(p => p.isFeatured) ?? plans?.[0];
+  const bridal = eventPackages?.find(p => p.slug.includes('bridal')) ?? eventPackages?.[0];
 
   const rated = reviews?.length ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : null;
   const fromPrice = featured?.length ? Math.min(...featured.map(s => s.price)) : null;
@@ -184,6 +194,80 @@ export default async function HomePage() {
         </div>
       </section>
 
+
+      {/* ---------- Monthly packages + events ---------- */}
+      {plan || bridal ? (
+        <section className="container-page grid gap-6 pt-20 sm:pt-28 lg:grid-cols-2">
+          {plan ? (
+            <div className="card flex flex-col p-7 sm:p-10">
+              <p className="eyebrow">Monthly packages</p>
+              <h2 className="mt-3 text-3xl leading-tight sm:text-4xl">Your routine, on a members&apos; price</h2>
+              <p className="mt-3 text-muted">
+                Treatments included every month plus a discount on everything else, applied automatically when you book.
+              </p>
+              <div className="mt-7 flex-1 rounded-2xl bg-ivory p-5">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <p className="font-display text-xl font-semibold text-plum-900">
+                    {plan.name}
+                    {plan.isFeatured ? (
+                      <span className="ml-2 rounded-full bg-rose-100 px-2.5 py-0.5 align-middle font-sans text-[11px] font-semibold uppercase tracking-wider text-rose-600">
+                        Most popular
+                      </span>
+                    ) : null}
+                  </p>
+                  <p className="font-display text-2xl font-semibold text-plum-900">
+                    {formatPrice(plan.price, plan.currency)}
+                    <span className="font-sans text-sm font-normal text-muted"> / month</span>
+                  </p>
+                </div>
+                <ul className="mt-4 grid gap-2 text-sm text-ink/80 sm:grid-cols-2">
+                  {plan.includes.map(i => (
+                    <li key={i.serviceId} className="flex gap-2">
+                      <Check className="mt-0.5 size-4 shrink-0 text-rose-500" /> {i.quantity}× {i.serviceName}
+                    </li>
+                  ))}
+                  {plan.discountPercent ? (
+                    <li className="flex gap-2">
+                      <Percent className="mt-0.5 size-4 shrink-0 text-rose-500" /> {plan.discountPercent}% off everything else
+                    </li>
+                  ) : null}
+                </ul>
+              </div>
+              <ButtonLink href="/packages" variant="outline" className="mt-7 self-start">
+                Compare packages <ArrowRight className="size-4" />
+              </ButtonLink>
+            </div>
+          ) : null}
+          {bridal ? (
+            <Link
+              href="/events"
+              className="group relative flex min-h-[420px] flex-col justify-end overflow-hidden rounded-[var(--radius-card)] p-7 text-white shadow-soft sm:p-10"
+            >
+              <Photo
+                src={bridal.imageUrl}
+                alt=""
+                kind="event"
+                className="absolute inset-0 h-full w-full transition-transform duration-700 group-hover:scale-[1.03]"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-plum-900/90 via-plum-900/40 to-transparent" />
+              <div className="relative">
+                <p className="eyebrow inline-flex items-center gap-2 !text-rose-300">
+                  <PartyPopper className="size-4" /> Bridal &amp; events
+                </p>
+                <h2 className="mt-3 text-3xl leading-tight !text-white sm:text-4xl">Wedding-day beauty, perfected</h2>
+                <p className="mt-3 max-w-md text-white/80">
+                  Bridal glam, mehendi parties, Teej groups and photoshoots, at our studios or your venue. From{' '}
+                  {formatPrice(bridal.fromPrice, bridal.currency)}.
+                </p>
+                <span className="mt-6 inline-flex items-center gap-1.5 font-semibold text-white group-hover:gap-2.5" style={{ transition: 'gap 0.2s' }}>
+                  Request a quote <ArrowRight className="size-4" />
+                </span>
+              </div>
+            </Link>
+          ) : null}
+        </section>
+      ) : null}
+
       {/* ---------- Team ---------- */}
       {staff?.length ? (
         <section id="team" className="container-page scroll-mt-24 py-20 sm:py-28">
@@ -203,6 +287,28 @@ export default async function HomePage() {
                   Book with {m.name.split(' ')[0]}
                 </ButtonLink>
               </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {/* ---------- Recommended products ---------- */}
+      {products?.length ? (
+        <section className="container-page pb-20 sm:pb-28">
+          <div className="flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-end">
+            <SectionHeading
+              align="left"
+              eyebrow="Take the glow home"
+              title="Recommended by our pros"
+              intro="The aftercare our specialists swear by. Reserve online, pay and collect at any branch."
+            />
+            <ButtonLink href="/products" variant="outline">
+              Visit the shop <ArrowRight className="size-4" />
+            </ButtonLink>
+          </div>
+          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {products.slice(0, 4).map(p => (
+              <ProductCard key={p.id} product={p} compact />
             ))}
           </div>
         </section>

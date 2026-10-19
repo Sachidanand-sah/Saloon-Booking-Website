@@ -34,9 +34,14 @@ export function SiteFooter({ hours, branches }: { hours: OpeningHours[] | null; 
           <ul className="mt-4 space-y-2 text-sm">
             <li><Link className="hover:text-white" href="/services">All services</Link></li>
             <li><Link className="hover:text-white" href="/book">Book an appointment</Link></li>
-            <li><Link className="hover:text-white" href="/account">My bookings</Link></li>
+            <li><Link className="hover:text-white" href="/packages">Monthly packages</Link></li>
+            <li><Link className="hover:text-white" href="/events">Bridal &amp; events</Link></li>
+            <li><Link className="hover:text-white" href="/products">Shop</Link></li>
+            <li><Link className="hover:text-white" href="/rewards">Lalima Rewards</Link></li>
             <li><Link className="hover:text-white" href="/#team">Meet the team</Link></li>
+            <li><Link className="hover:text-white" href="/#reviews">Reviews</Link></li>
             <li><Link className="hover:text-white" href="/locations">Our locations</Link></li>
+            <li><Link className="hover:text-white" href="/account">My account</Link></li>
           </ul>
         </div>
 

@@ -5,9 +5,10 @@ import { ArrowLeft, ArrowRight, CalendarCheck, Clock, MapPin, ShieldCheck, Spark
 import { ButtonLink } from '@/components/ui/button';
 import { Avatar, ServiceArt, Stars } from '@/components/ui/misc';
 import { ServiceCard } from '@/components/site/service-card';
+import { ProductCard } from '@/components/shop/product-card';
 import { getPublic } from '@/lib/server/api';
 import { formatDuration, formatPrice } from '@/lib/format';
-import type { LocationListItem, Review, SalonInfo, Service } from '@/lib/types';
+import type { LocationListItem, Product, Review, SalonInfo, Service } from '@/lib/types';
 import { formatAddress } from '@/lib/maps';
 
 type Props = { params: Promise<{ slug: string }> };
@@ -26,11 +27,12 @@ export default async function ServicePage({ params }: Props) {
   const service = await getPublic<Service>(`/services/${slug}`);
   if (!service) notFound();
 
-  const [reviews, related, salon, branches] = await Promise.all([
+  const [reviews, related, salon, branches, aftercare] = await Promise.all([
     getPublic<Review[]>(`/reviews?serviceId=${service.id}&limit=3`),
     service.category ? getPublic<Service[]>(`/services?category=${service.category.slug}`) : null,
     getPublic<SalonInfo>('/salon', 300),
     getPublic<LocationListItem[]>('/locations', 300),
+    getPublic<Product[]>(`/products?serviceId=${service.id}`),
   ]);
   const offeredAt = (branches ?? []).filter(b => b.serviceIds.includes(service.id));
   const others = (related ?? []).filter(s => s.id !== service.id).slice(0, 3);
@@ -144,6 +146,26 @@ export default async function ServicePage({ params }: Props) {
                 <blockquote className="mt-3 text-sm leading-relaxed text-ink/80">“{r.comment}”</blockquote>
                 <figcaption className="mt-4 text-sm font-semibold text-plum-900">{r.author}</figcaption>
               </figure>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {aftercare?.length ? (
+        <section className="container-page pb-16 pt-4">
+          <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
+            <div>
+              <p className="eyebrow">Aftercare</p>
+              <h2 className="mt-2 text-3xl">Recommended by our professionals</h2>
+              <p className="mt-2 text-muted">Keep your {service.name.toLowerCase()} looking its best at home.</p>
+            </div>
+            <Link href="/products" className="inline-flex items-center gap-1 text-sm font-semibold text-rose-600 hover:gap-2">
+              Shop all products <ArrowRight className="size-4" />
+            </Link>
+          </div>
+          <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {aftercare.slice(0, 3).map(p => (
+              <ProductCard key={p.id} product={p} compact />
             ))}
           </div>
         </section>
