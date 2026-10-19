@@ -1,7 +1,10 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { DateTime } from 'luxon';
-import { BookingStatus, Prisma, Role } from '@prisma/client';
+import { BookingStatus, LoyaltyReason, Prisma, Role } from '@prisma/client';
+import { benefitFor } from '../../lib/membership';
+import { maxRedeemable, pointsToCents, refundRedeemed } from '../../lib/loyalty';
+import { toPrice } from '../../lib/money';
 import { config } from '../../config/env';
 import { prisma } from '../../lib/prisma';
 import { badRequest, conflict, forbidden, HttpError, notFound } from '../../lib/errors';
@@ -82,6 +85,8 @@ bookingsRouter.post('/', async (req, res) => {
       locationId: z.string().min(1).optional(),
       startAt: startAtField,
       notes: z.string().trim().max(500).optional(),
+      /** Loyalty points to spend; capped by balance and the redeem limit. */
+      redeemPoints: z.number().int().min(0).optional(),
     }),
   );
   const { sub } = currentUser(req);
@@ -92,31 +97,82 @@ bookingsRouter.post('/', async (req, res) => {
     locationId: data.locationId,
   });
   const staffId = await chooseStaff(staffIds, data.staffId, data.startAt);
-  const { priceCents } = await prisma.service.findUniqueOrThrow({
-    where: { id: service.id },
-    select: { priceCents: true },
-  });
+  const quote = await priceQuote(sub, service.id, data.startAt);
+  const redeem = Math.min(data.redeemPoints ?? 0, quote.maxRedeemablePoints);
 
   try {
-    const booking = await prisma.booking.create({
-      data: {
-        customerId: sub,
-        serviceId: service.id,
-        staffId,
-        locationId: await staffLocation(staffId),
-        startAt: data.startAt,
-        endAt: new Date(data.startAt.getTime() + service.durationMins * 60_000),
-        priceCents,
-        notes: data.notes,
-        status: BookingStatus.CONFIRMED,
-      },
-      include,
+    const booking = await prisma.$transaction(async tx => {
+      const created = await tx.booking.create({
+        data: {
+          customerId: sub,
+          serviceId: service.id,
+          staffId,
+          locationId: await staffLocation(staffId),
+          startAt: data.startAt,
+          endAt: new Date(data.startAt.getTime() + service.durationMins * 60_000),
+          priceCents: quote.priceCents,
+          discountCents: quote.membership.discountCents + pointsToCents(redeem),
+          pointsRedeemed: redeem,
+          membershipId: quote.membership.kind ? quote.membership.membershipId : null,
+          notes: data.notes,
+          status: BookingStatus.CONFIRMED,
+        },
+        include,
+      });
+      if (redeem > 0) {
+        // Conditional decrement so two simultaneous bookings can't overspend the balance.
+        const { count } = await tx.user.updateMany({
+          where: { id: sub, loyaltyPoints: { gte: redeem } },
+          data: { loyaltyPoints: { decrement: redeem } },
+        });
+        if (count === 0) throw conflict('Your points balance has changed. Please review and try again.', 'POINTS_CHANGED');
+        await tx.loyaltyTransaction.create({
+          data: { userId: sub, points: -redeem, reason: LoyaltyReason.REDEEMED, bookingId: created.id },
+        });
+      }
+      return created;
     });
     res.status(201).json({ message: 'Booking confirmed', booking: serialize.booking(booking) });
   } catch (err) {
     if (isOverlapViolation(err)) throw slotTaken();
     throw err;
   }
+});
+
+/** Price breakdown before confirming: membership saving and how many points can be used. */
+async function priceQuote(userId: string, serviceId: string, startAt: Date) {
+  const service = await prisma.service.findFirst({ where: { OR: [{ id: serviceId }, { slug: serviceId }] } });
+  if (!service) throw notFound('Service');
+  const [membership, user] = await Promise.all([
+    benefitFor(userId, service.id, startAt, service.priceCents),
+    prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { loyaltyPoints: true } }),
+  ]);
+  const afterMembership = service.priceCents - membership.discountCents;
+  return {
+    priceCents: service.priceCents,
+    membership,
+    pointsBalance: user.loyaltyPoints,
+    maxRedeemablePoints: maxRedeemable(user.loyaltyPoints, afterMembership),
+    afterMembershipCents: afterMembership,
+  };
+}
+
+bookingsRouter.get('/quote', async (req, res) => {
+  const q = query(req, z.object({ serviceId: z.string().min(1), startAt: startAtField }));
+  const quote = await priceQuote(currentUser(req).sub, q.serviceId, q.startAt);
+  res.json({
+    currency: config.CURRENCY,
+    price: toPrice(quote.priceCents),
+    membership: quote.membership.kind
+      ? { planName: quote.membership.planName, kind: quote.membership.kind, discount: toPrice(quote.membership.discountCents) }
+      : null,
+    afterMembership: toPrice(quote.afterMembershipCents),
+    points: {
+      balance: quote.pointsBalance,
+      maxRedeemable: quote.maxRedeemablePoints,
+      pointValue: config.LOYALTY_POINT_VALUE_CENTS / 100,
+    },
+  });
 });
 
 bookingsRouter.get('/', async (req, res) => {
@@ -167,10 +223,14 @@ bookingsRouter.post('/:id/cancel', async (req, res) => {
   const { sub, role } = currentUser(req);
   const existing = await loadOwnBooking(req.params.id, sub, role);
   if (role !== Role.ADMIN) assertChangeable(existing, 'cancelled');
-  const booking = await prisma.booking.update({
-    where: { id: existing.id },
-    data: { status: BookingStatus.CANCELLED, cancelledAt: new Date() },
-    include,
+  const booking = await prisma.$transaction(async tx => {
+    const updated = await tx.booking.update({
+      where: { id: existing.id },
+      data: { status: BookingStatus.CANCELLED, cancelledAt: new Date() },
+      include,
+    });
+    await refundRedeemed(tx, updated);
+    return updated;
   });
   res.json({ message: 'Booking cancelled', booking: serialize.booking(booking) });
 });

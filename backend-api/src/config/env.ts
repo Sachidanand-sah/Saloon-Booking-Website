@@ -19,6 +19,12 @@ const schema = z.object({
   CANCEL_CUTOFF_MINS: z.coerce.number().int().min(0).default(120),
   // Login/signup attempts allowed per client IP per 15 minutes.
   AUTH_RATE_LIMIT: z.coerce.number().int().positive().default(20),
+  // Loyalty programme: points earned per Rs. 100 paid, value of one point (paisa),
+  // max share of a visit payable with points, and the welcome bonus.
+  LOYALTY_POINTS_PER_100: z.coerce.number().min(0).default(5),
+  LOYALTY_POINT_VALUE_CENTS: z.coerce.number().int().positive().default(100),
+  LOYALTY_MAX_REDEEM_PERCENT: z.coerce.number().int().min(0).max(100).default(50),
+  LOYALTY_SIGNUP_BONUS: z.coerce.number().int().min(0).default(100),
 });
 
 const parsed = schema.safeParse(process.env);

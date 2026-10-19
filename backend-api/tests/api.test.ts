@@ -103,7 +103,7 @@ describe('catalog', () => {
   it('lists services with price in currency units', async () => {
     const res = await request(app).get('/api/services');
     expect(res.status).toBe(200);
-    expect(res.body[0]).toMatchObject({ slug: 'cut', name: 'Haircut', price: 35, durationMins: 60 });
+    expect(res.body.find((s: { slug: string }) => s.slug === 'cut')).toMatchObject({ name: 'Haircut', price: 35, durationMins: 60 });
   });
 
   it('finds a service by slug', async () => {

@@ -6,6 +6,7 @@ import { BookingStatus, PrismaClient, Role, type Service, type Staff } from '@pr
 import bcrypt from 'bcryptjs';
 import { DateTime } from 'luxon';
 import 'dotenv/config';
+import { clearExtras, seedExtras } from './seed-extras';
 
 const prisma = new PrismaClient();
 const zone = process.env.SALON_TIMEZONE || 'UTC';
@@ -94,13 +95,17 @@ const staff = [
 ];
 
 async function main() {
+  await clearExtras(prisma);
   await prisma.$transaction([
     prisma.review.deleteMany(),
     prisma.booking.deleteMany(),
+    prisma.membership.deleteMany(),
     prisma.refreshToken.deleteMany(),
     prisma.workingHours.deleteMany(),
     prisma.staffService.deleteMany(),
     prisma.staff.deleteMany(),
+    prisma.membershipPlanItem.deleteMany(),
+    prisma.membershipPlan.deleteMany(),
     prisma.service.deleteMany(),
     prisma.category.deleteMany(),
     prisma.user.deleteMany(),
@@ -191,6 +196,14 @@ async function main() {
     await book(u.c, u.s, u.st, today.plus({ days: u.daysAhead }).plus({ minutes: u.at }), BookingStatus.CONFIRMED);
   }
 
+  const extras = await seedExtras(prisma, {
+    services: createdServices,
+    staff: createdStaff,
+    customers,
+    branches: await prisma.location.findMany(),
+    zone,
+  });
+  console.log(`Seeded ${extras.plans} packages, ${extras.events} event packages, ${extras.products} products.`);
   console.log(`Seeded ${branches.length} branches, ${services.length} services, ${staff.length} stylists, ${customers.length} customers.`);
   console.log('Logins: admin@lalima.test / Admin@12345 · sunita@lalima.test / Staff@12345 · hello@example.com / password123');
 }

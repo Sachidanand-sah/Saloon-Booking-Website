@@ -8,6 +8,7 @@ export const publicUser = (u: User) => ({
   email: u.email,
   phone: u.phone,
   role: u.role,
+  loyaltyPoints: u.loyaltyPoints,
   createdAt: u.createdAt,
 });
 
@@ -75,6 +76,10 @@ export const booking = (b: BookingWithRelations, now = new Date()) => {
     startAt: b.startAt,
     endAt: b.endAt,
     price: toPrice(b.priceCents),
+    discount: toPrice(b.discountCents),
+    total: toPrice(b.priceCents - b.discountCents),
+    pointsRedeemed: b.pointsRedeemed,
+    membershipApplied: !!b.membershipId,
     currency: config.CURRENCY,
     notes: b.notes,
     createdAt: b.createdAt,

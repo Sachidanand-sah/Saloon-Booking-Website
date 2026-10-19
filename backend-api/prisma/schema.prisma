@@ -13,6 +13,37 @@ enum Role {
   ADMIN
 }
 
+enum MembershipStatus {
+  PENDING
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum LoyaltyReason {
+  SIGNUP_BONUS
+  EARNED
+  REDEEMED
+  REFUNDED
+  ADJUSTMENT
+}
+
+enum EventRequestStatus {
+  NEW
+  QUOTED
+  CONFIRMED
+  DECLINED
+  CANCELLED
+  COMPLETED
+}
+
+enum ReservationStatus {
+  PENDING
+  READY
+  COLLECTED
+  CANCELLED
+}
+
 enum BookingStatus {
   PENDING
   CONFIRMED
@@ -22,18 +53,24 @@ enum BookingStatus {
 }
 
 model User {
-  id            String         @id @default(cuid())
+  id            String               @id @default(cuid())
   name          String
-  email         String         @unique
+  email         String               @unique
   phone         String?
   passwordHash  String
-  role          Role           @default(CUSTOMER)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  role          Role                 @default(CUSTOMER)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  /// Current redeemable loyalty balance (sum of LoyaltyTransaction.points).
+  loyaltyPoints Int                  @default(0)
   staffProfile  Staff?
   bookings      Booking[]
   reviews       Review[]
   refreshTokens RefreshToken[]
+  memberships   Membership[]
+  loyalty       LoyaltyTransaction[]
+  eventRequests EventRequest[]
+  reservations  ProductReservation[]
 }
 
 model RefreshToken {
@@ -50,24 +87,27 @@ model RefreshToken {
 
 /// A salon branch. Stylists work at one branch; bookings remember where they took place.
 model Location {
-  id           String    @id @default(cuid())
-  slug         String    @unique
-  name         String
-  description  String?
-  addressLine1 String
-  addressLine2 String?
-  city         String
-  phone        String?
-  email        String?
-  latitude     Float?
-  longitude    Float?
-  imageUrl     String?
-  isActive     Boolean   @default(true)
-  sortOrder    Int       @default(0)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  staff        Staff[]
-  bookings     Booking[]
+  id            String               @id @default(cuid())
+  slug          String               @unique
+  name          String
+  description   String?
+  addressLine1  String
+  addressLine2  String?
+  city          String
+  phone         String?
+  email         String?
+  latitude      Float?
+  longitude     Float?
+  imageUrl      String?
+  isActive      Boolean              @default(true)
+  sortOrder     Int                  @default(0)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  staff         Staff[]
+  bookings      Booking[]
+  memberships   Membership[]
+  eventRequests EventRequest[]
+  reservations  ProductReservation[]
 }
 
 model Category {
@@ -80,40 +120,43 @@ model Category {
 }
 
 model Service {
-  id           String         @id @default(cuid())
-  slug         String         @unique
+  id           String               @id @default(cuid())
+  slug         String               @unique
   name         String
   description  String
   durationMins Int
   priceCents   Int
   imageUrl     String?
-  isActive     Boolean        @default(true)
-  isFeatured   Boolean        @default(false)
+  isActive     Boolean              @default(true)
+  isFeatured   Boolean              @default(false)
   categoryId   String
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  category     Category       @relation(fields: [categoryId], references: [id])
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  category     Category             @relation(fields: [categoryId], references: [id])
   staff        StaffService[]
   bookings     Booking[]
+  planItems    MembershipPlanItem[]
+  products     ProductService[]
 
   @@index([categoryId])
 }
 
 model Staff {
-  id           String         @id @default(cuid())
-  userId       String?        @unique
+  id           String                  @id @default(cuid())
+  userId       String?                 @unique
   name         String
   title        String
   bio          String?
   avatarUrl    String?
-  isActive     Boolean        @default(true)
+  isActive     Boolean                 @default(true)
   locationId   String?
-  createdAt    DateTime       @default(now())
-  user         User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
-  location     Location?      @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  createdAt    DateTime                @default(now())
+  user         User?                   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  location     Location?               @relation(fields: [locationId], references: [id], onDelete: SetNull)
   services     StaffService[]
   workingHours WorkingHours[]
   bookings     Booking[]
+  recommends   ProductRecommendation[]
 }
 
 model StaffService {
@@ -138,24 +181,31 @@ model WorkingHours {
 }
 
 model Booking {
-  id          String        @id @default(cuid())
-  customerId  String
-  serviceId   String
-  staffId     String
-  locationId  String?
-  startAt     DateTime
-  endAt       DateTime
-  status      BookingStatus @default(CONFIRMED)
-  priceCents  Int
-  notes       String?
-  cancelledAt DateTime?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  customer    User          @relation(fields: [customerId], references: [id])
-  service     Service       @relation(fields: [serviceId], references: [id])
-  staff       Staff         @relation(fields: [staffId], references: [id])
-  location    Location?     @relation(fields: [locationId], references: [id], onDelete: SetNull)
-  review      Review?
+  id             String               @id @default(cuid())
+  customerId     String
+  serviceId      String
+  staffId        String
+  locationId     String?
+  startAt        DateTime
+  endAt          DateTime
+  status         BookingStatus        @default(CONFIRMED)
+  /// List price at time of booking; the customer pays priceCents - discountCents.
+  priceCents     Int
+  /// Membership benefit + redeemed loyalty points.
+  discountCents  Int                  @default(0)
+  pointsRedeemed Int                  @default(0)
+  membershipId   String?
+  notes          String?
+  cancelledAt    DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  customer       User                 @relation(fields: [customerId], references: [id])
+  service        Service              @relation(fields: [serviceId], references: [id])
+  staff          Staff                @relation(fields: [staffId], references: [id])
+  location       Location?            @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  membership     Membership?          @relation(fields: [membershipId], references: [id], onDelete: SetNull)
+  review         Review?
+  loyalty        LoyaltyTransaction[]
 
   @@index([staffId, startAt])
   @@index([customerId, startAt])
@@ -171,4 +221,200 @@ model Review {
   createdAt  DateTime @default(now())
   booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   customer   User     @relation(fields: [customerId], references: [id])
+}
+
+// ---------------------------------------------------------------------------
+// Monthly packages (memberships). Requested online, paid and activated at the salon.
+
+model MembershipPlan {
+  id              String               @id @default(cuid())
+  slug            String               @unique
+  name            String
+  tagline         String?
+  description     String
+  /// Monthly price.
+  priceCents      Int
+  durationDays    Int                  @default(30)
+  /// Discount on every other service while active.
+  discountPercent Int                  @default(0)
+  /// Short selling points shown on the plan card.
+  perks           String[]
+  isActive        Boolean              @default(true)
+  isFeatured      Boolean              @default(false)
+  sortOrder       Int                  @default(0)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  items           MembershipPlanItem[]
+  memberships     Membership[]
+}
+
+/// Services included free each period, e.g. 2 x Blow-dry per month.
+model MembershipPlanItem {
+  planId    String
+  serviceId String
+  quantity  Int
+  plan      MembershipPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  service   Service        @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@id([planId, serviceId])
+}
+
+model Membership {
+  id         String           @id @default(cuid())
+  userId     String
+  planId     String
+  locationId String?
+  status     MembershipStatus @default(PENDING)
+  priceCents Int
+  startsAt   DateTime?
+  endsAt     DateTime?
+  note       String?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan       MembershipPlan   @relation(fields: [planId], references: [id])
+  location   Location?        @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  bookings   Booking[]
+
+  @@index([userId, status])
+}
+
+// ---------------------------------------------------------------------------
+// Loyalty: points earned on completed visits, redeemable as a discount.
+
+model LoyaltyTransaction {
+  id        String        @id @default(cuid())
+  userId    String
+  points    Int
+  reason    LoyaltyReason
+  bookingId String?
+  note      String?
+  createdAt DateTime      @default(now())
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  booking   Booking?      @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([bookingId])
+}
+
+// ---------------------------------------------------------------------------
+// Events: bridal, parties, groups. Customer requests, salon quotes, customer accepts.
+
+model EventPackage {
+  id             String         @id @default(cuid())
+  slug           String         @unique
+  name           String
+  description    String
+  /// "From" price; the final price is quoted per request.
+  fromPriceCents Int
+  includes       String[]
+  minGuests      Int            @default(1)
+  maxGuests      Int?
+  imageUrl       String?
+  isActive       Boolean        @default(true)
+  sortOrder      Int            @default(0)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  requests       EventRequest[]
+}
+
+model EventRequest {
+  id               String             @id @default(cuid())
+  userId           String
+  packageId        String
+  locationId       String?
+  /// Salon-local date YYYY-MM-DD and preferred start time HH:mm.
+  eventDate        String
+  startTime        String?
+  guestCount       Int
+  /// Set when the team should travel to the customer's venue.
+  venue            String?
+  notes            String?
+  contactPhone     String
+  status           EventRequestStatus @default(NEW)
+  quotedPriceCents Int?
+  quoteNote        String?
+  quotedAt         DateTime?
+  respondedAt      DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  package          EventPackage       @relation(fields: [packageId], references: [id])
+  location         Location?          @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  @@index([status, eventDate])
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Products recommended by professionals; reserved online, collected at a branch.
+
+model Product {
+  id              String                  @id @default(cuid())
+  slug            String                  @unique
+  name            String
+  brand           String
+  /// Hair care, Skin care, Nail care, Body & spa...
+  category        String
+  description     String
+  howToUse        String?
+  priceCents      Int
+  imageUrl        String?
+  inStock         Boolean                 @default(true)
+  isActive        Boolean                 @default(true)
+  isFeatured      Boolean                 @default(false)
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  recommendations ProductRecommendation[]
+  services        ProductService[]
+  reservedItems   ReservationItem[]
+}
+
+/// "Recommended by Sunita: ..."
+model ProductRecommendation {
+  productId String
+  staffId   String
+  note      String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  staff     Staff   @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@id([productId, staffId])
+}
+
+/// Aftercare products suggested for a service.
+model ProductService {
+  productId String
+  serviceId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  service   Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@id([productId, serviceId])
+}
+
+model ProductReservation {
+  id         String            @id @default(cuid())
+  userId     String
+  locationId String
+  status     ReservationStatus @default(PENDING)
+  totalCents Int
+  note       String?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  location   Location          @relation(fields: [locationId], references: [id])
+  items      ReservationItem[]
+
+  @@index([userId])
+  @@index([locationId, status])
+}
+
+model ReservationItem {
+  reservationId String
+  productId     String
+  quantity      Int
+  priceCents    Int
+  reservation   ProductReservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  product       Product            @relation(fields: [productId], references: [id])
+
+  @@id([reservationId, productId])
 }

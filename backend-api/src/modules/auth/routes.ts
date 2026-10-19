@@ -9,7 +9,8 @@ import { publicUser } from '../../lib/serialize';
 import { consumeRefreshToken, issueRefreshToken, revokeRefreshToken, signAccessToken } from '../../lib/tokens';
 import { currentUser, requireAuth } from '../../middleware/auth';
 import { body } from '../../middleware/validate';
-import type { User } from '@prisma/client';
+import { LoyaltyReason, type User } from '@prisma/client';
+import { addPoints } from '../../lib/loyalty';
 
 export const authRouter = Router();
 
@@ -44,8 +45,18 @@ authRouter.post('/signup', authLimiter, async (req, res) => {
   if (await prisma.user.findUnique({ where: { email: data.email } })) {
     throw conflict('An account with this email already exists', 'EMAIL_TAKEN');
   }
-  const user = await prisma.user.create({
-    data: { name: data.name, email: data.email, phone: data.phone, passwordHash: await bcrypt.hash(data.password, 10) },
+  const passwordHash = await bcrypt.hash(data.password, 10);
+  const user = await prisma.$transaction(async tx => {
+    const created = await tx.user.create({
+      data: { name: data.name, email: data.email, phone: data.phone, passwordHash },
+    });
+    await addPoints(tx, {
+      userId: created.id,
+      points: config.LOYALTY_SIGNUP_BONUS,
+      reason: LoyaltyReason.SIGNUP_BONUS,
+      note: 'Welcome to the loyalty programme',
+    });
+    return created;
   });
   res.status(201).json({ message: 'Account created', ...(await session(user)) });
 });

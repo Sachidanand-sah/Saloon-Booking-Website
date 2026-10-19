@@ -10,6 +10,7 @@ import * as serialize from '../../lib/serialize';
 import { requireAuth, requireRole } from '../../middleware/auth';
 import { body, query } from '../../middleware/validate';
 import { ACTIVE_STATUSES } from '../availability/service';
+import { awardForBooking, refundRedeemed, reverseAward } from '../../lib/loyalty';
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth, requireRole(Role.ADMIN));
@@ -138,13 +139,21 @@ adminRouter.patch('/bookings/:id', async (req, res) => {
   const data = body(req, z.object({ status: z.nativeEnum(BookingStatus) }));
   const existing = await prisma.booking.findUnique({ where: { id: req.params.id } });
   if (!existing) throw notFound('Booking');
-  const booking = await prisma.booking.update({
-    where: { id: existing.id },
-    data: {
-      status: data.status,
-      cancelledAt: data.status === BookingStatus.CANCELLED ? (existing.cancelledAt ?? new Date()) : null,
-    },
-    include: { service: true, staff: true, customer: true, review: true, location: true },
+  const booking = await prisma.$transaction(async tx => {
+    const updated = await tx.booking.update({
+      where: { id: existing.id },
+      data: {
+        status: data.status,
+        cancelledAt: data.status === BookingStatus.CANCELLED ? (existing.cancelledAt ?? new Date()) : null,
+      },
+      include: { service: true, staff: true, customer: true, review: true, location: true },
+    });
+    // Loyalty follows the visit outcome: completed visits earn points, cancellations
+    // return any points spent, and un-completing a visit takes its points back.
+    if (data.status === BookingStatus.COMPLETED) await awardForBooking(tx, updated);
+    else if (existing.status === BookingStatus.COMPLETED) await reverseAward(tx, updated);
+    if (data.status === BookingStatus.CANCELLED) await refundRedeemed(tx, updated);
+    return updated;
   });
   res.json({ booking: serialize.booking(booking) });
 });
