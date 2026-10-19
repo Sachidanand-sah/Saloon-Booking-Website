@@ -1,3 +1,4 @@
+import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, Alert, TouchableOpacity, ActivityIndicator } from 'react-native';
 
 import { API_BASE_URL } from '../config';
@@ -34,7 +35,7 @@ export default function LoginScreen({ navigation }) {
         setLoading(false);
         if (data.user) {
           Alert.alert('Success', `Welcome back, ${data.user.name}!`);
-          navigation.replace('Home', { user: data.user });
+          navigation.replace('Home', { user: data.user, accessToken: data.accessToken });
         } else {
           Alert.alert('Error', data.message || 'Invalid email or password');
         }

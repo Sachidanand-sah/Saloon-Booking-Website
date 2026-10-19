@@ -5,7 +5,7 @@ import { API_BASE_URL } from '../config';
 
 const API_URL = `${API_BASE_URL}/services`; 
 
-export default function HomeScreen({ navigation }) {
+export default function HomeScreen({ navigation, route }) {
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -25,10 +25,10 @@ export default function HomeScreen({ navigation }) {
   const renderItem = ({ item }) => (
     <View style={styles.itemContainer}>
       <Text style={styles.itemName}>{item.name}</Text>
-      <Text style={styles.itemPrice}>{item.price}</Text>
+      <Text style={styles.itemPrice}>${item.price} · {item.durationMins} min</Text>
       <TouchableOpacity
         style={styles.bookButton}
-        onPress={() => navigation.navigate('Booking', { service: item, user: route.params?.user })}
+        onPress={() => navigation.navigate('Booking', { service: item, user: route.params?.user, accessToken: route.params?.accessToken })}
       >
         <Text style={styles.bookButtonText}>Book Now</Text>
       </TouchableOpacity>

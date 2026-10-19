@@ -1,0 +1,147 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  STAFF
+  ADMIN
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+  NO_SHOW
+}
+
+model User {
+  id            String         @id @default(cuid())
+  name          String
+  email         String         @unique
+  phone         String?
+  passwordHash  String
+  role          Role           @default(CUSTOMER)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  staffProfile  Staff?
+  bookings      Booking[]
+  reviews       Review[]
+  refreshTokens RefreshToken[]
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  slug        String    @unique
+  name        String
+  description String?
+  sortOrder   Int       @default(0)
+  services    Service[]
+}
+
+model Service {
+  id           String         @id @default(cuid())
+  slug         String         @unique
+  name         String
+  description  String
+  durationMins Int
+  priceCents   Int
+  imageUrl     String?
+  isActive     Boolean        @default(true)
+  isFeatured   Boolean        @default(false)
+  categoryId   String
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  category     Category       @relation(fields: [categoryId], references: [id])
+  staff        StaffService[]
+  bookings     Booking[]
+
+  @@index([categoryId])
+}
+
+model Staff {
+  id           String         @id @default(cuid())
+  userId       String?        @unique
+  name         String
+  title        String
+  bio          String?
+  avatarUrl    String?
+  isActive     Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+  user         User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  services     StaffService[]
+  workingHours WorkingHours[]
+  bookings     Booking[]
+}
+
+model StaffService {
+  staffId   String
+  serviceId String
+  staff     Staff   @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  service   Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@id([staffId, serviceId])
+}
+
+/// Weekly shift in salon-local time. dayOfWeek: 1 = Monday … 7 = Sunday (ISO).
+model WorkingHours {
+  id          String @id @default(cuid())
+  staffId     String
+  dayOfWeek   Int
+  startMinute Int
+  endMinute   Int
+  staff       Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  @@index([staffId, dayOfWeek])
+}
+
+model Booking {
+  id          String        @id @default(cuid())
+  customerId  String
+  serviceId   String
+  staffId     String
+  startAt     DateTime
+  endAt       DateTime
+  status      BookingStatus @default(CONFIRMED)
+  priceCents  Int
+  notes       String?
+  cancelledAt DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  customer    User          @relation(fields: [customerId], references: [id])
+  service     Service       @relation(fields: [serviceId], references: [id])
+  staff       Staff         @relation(fields: [staffId], references: [id])
+  review      Review?
+
+  @@index([staffId, startAt])
+  @@index([customerId, startAt])
+}
+
+model Review {
+  id         String   @id @default(cuid())
+  bookingId  String   @unique
+  customerId String
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now())
+  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  customer   User     @relation(fields: [customerId], references: [id])
+}
