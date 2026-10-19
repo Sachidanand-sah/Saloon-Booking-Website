@@ -1,48 +1,57 @@
-# Salon Booking System
+# Lalima Beauty — Mobile App
 
-This project consists of three main components: a web application, a customer mobile app, and a backend API.
+The customer app for iOS and Android: book appointments across all branches, manage bookings, use monthly packages and loyalty points, request event quotes, and reserve products recommended by our professionals. It uses the same API as the website ([`backend-api`](../backend-api/README.md)).
 
-## Project Structure
+**Stack:** Expo SDK 54 · React Native 0.81 · TypeScript · React Navigation 7 · TanStack Query · expo-secure-store · expo-notifications
 
-- **`beauty-salon-booking/`**: Next.js Web Application (Admin/Main site).
-- **`customer-mobile-app/`**: React Native (Expo) Mobile Application for customers.
-- **`backend-api/`**: Node.js/Express Backend API handling data and bookings.
+## Run it
 
-## Getting Started
+1. Start the API (see its README) and, for photos, the website (`npm run dev` in `beauty-salon-booking`).
+2. Point the app at your computer. A phone can't reach `localhost`, so use your LAN IP (run `ipconfig`):
 
-### 1. Backend API
-The backend serves data to the mobile app (and potentially the web app).
+   ```bash
+   cd customer-mobile-app
+   cp .env.example .env     # then edit the IP in both lines
+   npm install
+   npm start                # scan the QR code with Expo Go
+   ```
 
-```bash
-cd backend-api
-npm install
-npm start
+   `npm run web` opens the same app in a browser, which is handy for a quick look.
+
+Demo login: `hello@example.com` / `password123` (has an active package, loyalty points and a product order).
+
+## What's inside
+
+| Tab / screen | What it does |
+| :--- | :--- |
+| Welcome, Log in, Sign up | Branded onboarding; the session is kept in the device's secure storage |
+| Home | Next appointment, points balance, categories, featured services, packages, bridal & events, recommended products, branches |
+| Book | Branch, then treatment, specialist (skipped when only one), date and time (live availability), confirm with member discount and "use my points" |
+| My bookings | Upcoming and past; reschedule, cancel, review, directions to the branch; optional reminder 2 hours before |
+| Shop | Products recommended by our pros, bag, reserve to collect at a branch |
+| Me | Rewards card and history, package usage, event requests and quotes, orders, profile, locations, contact |
+
+## Project layout
+
 ```
-*Runs on `http://localhost:5000`*
-
-### 2. Customer Mobile App
-A simple mobile app for customers to view services and book appointments.
-
-```bash
-cd customer-mobile-app
-npm install
-npm start
+App.tsx                  Providers (query client, auth, toasts), fonts, navigation
+src/
+  config.ts              API and site URLs (from .env), brand details
+  theme.ts               Design tokens shared with the website
+  api/                   Typed client (auto token refresh), query hooks, types
+  auth/                  Session provider, secure storage
+  components/            UI kit (ui.tsx), cards, toasts
+  lib/                   Formatting, maps/directions, bag, reminders
+  navigation/            Route types and the navigator
+  screens/               auth/ home/ booking/ account/ explore/ shop/
+__tests__/               Jest tests (jest-expo + Testing Library)
 ```
-*Use Expo Go on your phone to scan the QR code, or use an emulator.*
-*Note: The app is configured to connect to `http://10.0.2.2:5000` (Android Emulator) or `http://localhost:5000`. Update `API_URL` in `screens/HomeScreen.js` and `screens/BookingScreen.js` if running on a physical device.*
 
-### 3. Web Application
-The main salon website.
+## Scripts
 
-```bash
-cd beauty-salon-booking
-npm install
-npm run dev
-```
-*Runs on `http://localhost:3000`*
-
-## Features
-
-- **View Services**: Customers can browse available salon services.
-- **Book Appointments**: Simple booking flow sending data to the backend.
-- **Backend Storage**: Currently uses in-memory storage (data resets on restart).
+| Command | |
+| :--- | :--- |
+| `npm start` | Expo dev server (Expo Go / simulators) |
+| `npm run web` | Run in a browser |
+| `npm test` | Unit and component tests |
+| `npm run typecheck` | TypeScript |
