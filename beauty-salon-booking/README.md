@@ -1,128 +1,50 @@
-# 🌸 Lovely Glow - Premium Beauty Salon Booking Platform
+# Lovely Glow — Website
 
-**Lovely Glow** is a modern, full-stack salon booking web application built with **Next.js 16 (App Router)** and **Tailwind CSS v4**. It features a high-end, responsive design, a seamless multi-step booking wizard, and a secure admin dashboard for managing appointments.
+The customer website and admin dashboard for Lovely Glow. All data (services, stylists, availability, bookings, reviews) comes live from [`backend-api`](../backend-api/README.md).
 
-![Project Status](https://img.shields.io/badge/Status-Completed-success)
-![Next.js](https://img.shields.io/badge/Next.js-16.0-black)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4-cyan)
+**Stack:** Next.js 16 (App Router) · React 19 · Tailwind CSS v4 · TanStack Query · Zod · Playwright
 
-## ✨ Key Features
+## Quick start
 
-### 🎨 User Interface (Client)
-- **Premium Aesthetic**: Glassmorphism effects, custom "fade-in" animations, and a sophisticated Pink/Rose color palette.
-- **Responsive Design**: Fully mobile-optimized with a custom Hamburger Menu and adaptive grid layouts.
-- **Interactive Landing Page**:
-    - **Hero Section**: Immersive full-screen visual with call-to-actions.
-    - **Floating Features**: Glass-effect cards highlighting key selling points.
-    - **Popular Services**: Dynamic grid showcasing top treatments.
-    - **Testimonials**: "Client Stories" section with star ratings.
-- **Multi-Step Booking Wizard**:
-    - **Step 1**: Custom **Visual Calendar** for date selection + Time Slot selector.
-    - **Step 2**: Client Details Form (Name, Email, Phone).
-    - **Confirmation**: Instant booking feedback with a summary card.
-
-### 🛡️ Admin Dashboard
-- **Secure Access**: Simple password-protected entry key (`admin123`).
-- **Appointment Management**: View all incoming bookings in a sorted list.
-- **Status Control**: Real-time status updates (Pending, Confirmed, Completed, Cancelled).
-- **Data Persistence**: Uses local storage simulation for persistence (demo mode).
-
----
-
-## 🛠️ Technology Stack
-
-- **Framework**: [Next.js 16](https://nextjs.org/) (React 19, Turbopack)
-- **Styling**: [Tailwind CSS v4](https://tailwindcss.com/) (using `@tailwindcss/postcss`)
-- **Language**: TypeScript
-- **State Management**: React Hooks (`useState`, `useEffect`, `useMemo`)
-- **Icons**: Custom SVG Icons
-- **Fonts**: Custom Display Fonts architecture
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-- Node.js 18+ installed on your machine.
-
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd beauty-salon-booking
-   ```
-
-2. **Install Dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Run Development Server**
-   ```bash
-   npm run dev
-   ```
-   Open [http://localhost:3000](http://localhost:3000) to view the application.
-
-4. **Build for Production**
-   ```bash
-   npm run build
-   npm start
-   ```
-
----
-
-## 📖 Usage Guide
-
-### 1. Booking an Appointment (User)
-1. Navigate to the **Home Page** or click **"Book Online"**.
-2. Browse the **Services Menu** and click **"Book"** on a desired treatment.
-3. **Select a Date** using the visual calendar.
-4. **Choose a Time Slot** from the available list.
-5. Click **"Continue"** and enter your personal details.
-6. Click **"Confirm Booking"** to finalize.
-
-### 2. Managing Appointments (Admin)
-1. Navigate to `/admin`.
-2. Enter the secure password: **`admin123`**.
-3. **Dashboard View**: See a list of all appointments sorted by date/time.
-4. **Actions**:
-    - **Confirm**: Mark an appointment as confirmed.
-    - **Complete**: Mark as done after service.
-    - **Cancel**: Cancel a booking.
-    - **Delete**: Permanently remove a record.
-
----
-
-## 📂 Project Structure
+Start the API first (see its README: `npm run db:local`, `npm run db:seed`, `npm run dev`), then:
 
 ```bash
-├── app/
-│   ├── admin/          # Admin login and dashboard
-│   ├── book/           # Booking flow (Service selection & Form)
-│   ├── services/       # Services listing page
-│   ├── login/          # Client login page
-│   ├── globals.css     # Global styles & Tailwind imports
-│   └── layout.tsx      # Root layout (Navbar, Footer)
-├── components/
-│   ├── ui/             # Reusable UI (Button, Input)
-│   ├── BookingForm.tsx # Multi-step booking wizard logic
-│   ├── Calendar.tsx    # Custom visual calendar component
-│   └── Navbar.tsx      # Responsive navigation with Mobile Menu
-├── lib/
-│   └── storage.ts      # LocalStorage simulation for data persistence
-└── public/             # Static assets (images, icons)
+cd beauty-salon-booking
+npm install
+cp .env.example .env.local   # API_URL defaults to http://localhost:5000/api
+npm run dev                  # http://localhost:3000
 ```
 
----
+Demo logins come from the API seed: `admin@lovelyglow.test / Admin@12345` (admin) and `hello@example.com / password123` (customer).
 
-## 📝 Demo Credentials
+## What's inside
 
-| Role | Username / Access | Password |
-| :--- | :--- | :--- |
-| **Admin** | Access via `/admin` | `admin123` |
-| **Client** | `user@example.com` | `password123` |
+| Area | Routes |
+| :--- | :--- |
+| Marketing | `/` home (hero, categories, featured services, team, reviews, hours) · `/services` (filter + search) · `/services/[slug]` |
+| Booking | `/book`: 4-step wizard (treatment → specialist → date & time → confirm). State lives in the URL, so refresh, back button and "log in to continue" all keep the selection. `/book/success` adds the visit to Google/Apple/Outlook calendars |
+| Account | `/login`, `/signup`, `/account` (upcoming/past, reschedule, cancel, review, profile) |
+| Admin | `/admin` dashboard · `/admin/bookings` · `/admin/services` · `/admin/staff` (profiles, services, working hours) |
 
----
+## How it talks to the API
 
-*Built with ❤️ by the Lovely Glow Development Team.*
+- Server components read public catalog data directly from `API_URL` (`lib/server/api.ts`) with short caching.
+- The browser never sees tokens. Login/signup go through `/api/session/*`, which stores the API's tokens in **httpOnly cookies**. All other browser calls go through `/api/backend/*` (`app/api/backend/[...path]/route.ts`), which attaches the access token and refreshes it automatically.
+- `proxy.ts` redirects signed-out visitors away from `/account` and `/admin`, and non-admins away from `/admin`. The API enforces roles on every request regardless.
+
+## Customising
+
+- Brand name, address, phone and social links: `lib/site.ts`
+- Colours, fonts, radii, shadows: design tokens in `app/globals.css`
+- Services, prices, stylists and opening hours are managed in the admin dashboard; nothing is hard-coded.
+
+## Tests
+
+End-to-end tests run against a live site and API with seed data:
+
+```bash
+npx playwright install chromium   # once
+npm test                          # PLAYWRIGHT_BASE_URL=http://localhost:3001 to target another port
+```
+
+They cover browsing and filtering services, the full guest → sign-up → book → cancel flow, auth guards and the admin dashboard, on desktop and mobile viewports. Tests create throwaway accounts, so re-run `npm run db:seed` in `backend-api` afterwards for a clean demo.
