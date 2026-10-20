@@ -1,0 +1,13 @@
+{
+  "name": "lalima-beauty",
+  "private": true,
+  "description": "Lalima Beauty: backend-api, website (beauty-salon-booking) and mobile app (customer-mobile-app). Root scripts only drive the Render deploy of backend-api.",
+  "scripts": {
+    "postinstall": "node scripts/render.cjs build",
+    "start": "node scripts/render.cjs start",
+    "dev": "node scripts/render.cjs start"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
